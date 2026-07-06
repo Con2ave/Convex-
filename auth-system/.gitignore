@@ -1,0 +1,127 @@
+# ========================
+# SECRETS & ENVIRONMENT
+# ========================
+.env
+*.env
+!.env.example          # Keep the example template committed
+
+# ========================
+# VIRTUAL ENVIRONMENTS
+# ========================
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# ========================
+# PYTHON CACHE & BUILD
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+.installed.cfg
+MANIFEST
+
+# ========================
+# DATABASES
+# ========================
+*.db
+*.sqlite
+*.sqlite3
+auth_system.db
+test_auth_system.db
+
+# ========================
+# ALEMBIC RUNTIME
+# ========================
+# Keep the versions folder and env.py committed,
+# but ignore auto-generated runtime artefacts
+alembic/__pycache__/
+
+# ========================
+# TESTING & COVERAGE
+# ========================
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.cover
+.hypothesis/
+nosetests.xml
+test-results/
+
+# ========================
+# TYPE CHECKING
+# ========================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyright/
+pyrightconfig.json
+.pyre/
+
+# ========================
+# IDE & EDITOR FILES
+# ========================
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+*.iws
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+
+# ========================
+# OPERATING SYSTEM FILES
+# ========================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+
+# ========================
+# LOGS
+# ========================
+*.log
+logs/
+*.out
+
+# ========================
+# MISC
+# ========================
+.ipynb_checkpoints/
+*.bak
+*.tmp
+
+tests
