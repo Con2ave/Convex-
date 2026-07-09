@@ -7,6 +7,7 @@ import type { BalanceResponse, StudySessionResponse } from "../api/types";
 import { isWithinLastDays } from "../utils/format";
 import { DAILY_CAP_MINUTES, SUBJECTS, WEEKLY_CAP_MINUTES } from "../constants";
 import { BottomNav } from "../components/BottomNav";
+import { MenuSheet } from "../components/MenuSheet";
 import { SessionListRow } from "../components/SessionListRow";
 import { BellIcon, MenuIcon, SearchIcon, SlidersIcon } from "../components/icons";
 
@@ -20,6 +21,7 @@ export function Dashboard() {
   const [starting, setStarting] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [subject, setSubject] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     api
@@ -78,13 +80,15 @@ export function Dashboard() {
     <div className="app-shell">
       <div className="app-column has-nav">
         <div className="topbar">
-          <button className="topbar-icon-btn" aria-label="Menu">
+          <button className="topbar-icon-btn" aria-label="Menu" onClick={() => setShowMenu(true)}>
             <MenuIcon size={18} />
           </button>
           <button className="topbar-icon-btn" aria-label="Notifications">
             <BellIcon size={18} />
           </button>
         </div>
+
+        {showMenu && <MenuSheet onClose={() => setShowMenu(false)} />}
 
         <h1 className="display-heading">
           Hello, {user?.username}
@@ -94,20 +98,26 @@ export function Dashboard() {
 
         {error && <div className="banner banner-error" style={{ marginTop: "1rem" }}>{error}</div>}
 
-        <div className="search-row">
+        <form
+          className="search-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!starting && !openSession) void handleStart();
+          }}
+        >
           <div className="search-input-wrap">
             <SearchIcon size={17} />
             <input
+              type="search"
+              enterKeyHint="go"
               placeholder={openSession ? "Finish your current session first" : "What are you studying today?"}
               value={subject}
               disabled={!!openSession}
               onChange={(e) => setSubject(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !starting) void handleStart();
-              }}
             />
           </div>
           <button
+            type="button"
             className="search-filter-btn"
             aria-label="Subject shortcuts"
             disabled={!!openSession}
@@ -115,7 +125,7 @@ export function Dashboard() {
           >
             <SlidersIcon size={18} />
           </button>
-        </div>
+        </form>
 
         {showPicker && !openSession && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1.3rem" }}>

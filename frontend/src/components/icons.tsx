@@ -154,3 +154,67 @@ export function LogoutIcon({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+export function CloseIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <line x1="6" y1="6" x2="18" y2="18" />
+      <line x1="18" y1="6" x2="6" y2="18" />
+    </svg>
+  );
+}
+
+export function SettingsIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3v2.6M12 18.4V21M21 12h-2.6M5.6 12H3M18.4 5.6l-1.85 1.85M7.45 16.55l-1.85 1.85M18.4 18.4l-1.85-1.85M7.45 7.45 5.6 5.6" />
+    </svg>
+  );
+}
+
+export function HelpIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.4 9.3a2.6 2.6 0 1 1 3.6 2.4c-.9.4-1.4 1.1-1.4 2.1v.3" />
+      <circle cx="12" cy="17" r="0.65" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function SunIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <circle cx="12" cy="12" r="4.3" />
+      <path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12H5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8" />
+    </svg>
+  );
+}
+
+export function MoonIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M20 14.3A8.5 8.5 0 1 1 9.7 4a7 7 0 0 0 10.3 10.3Z" />
+    </svg>
+  );
+}
+
+export function DeviceIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <rect x="3" y="4.5" width="18" height="12" rx="1.6" />
+      <line x1="8" y1="20" x2="16" y2="20" />
+      <line x1="12" y1="16.5" x2="12" y2="20" />
+    </svg>
+  );
+}
+
+export function MailIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <polyline points="3 6.5 12 13 21 6.5" />
+    </svg>
+  );
+}

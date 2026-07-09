@@ -508,6 +508,7 @@ textarea.input {
   text-align: left;
   font-family: inherit;
   color: inherit;
+  text-decoration: none;
 }
 .list-row + .list-row {
   margin-top: 0.55rem;
@@ -611,6 +612,43 @@ textarea.input {
 }
 .bottom-nav-item.is-active {
   color: var(--text);
+}
+
+/* ---------- Sheet (menu / overlays) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 8, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  animation: sheet-fade 0.2s ease;
+}
+.sheet-panel {
+  width: 100%;
+  max-width: 30rem;
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  padding: 0.7rem 1.25rem 1.6rem;
+  box-shadow: var(--shadow);
+  animation: sheet-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin: 0 auto 1.1rem;
+}
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-rise {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 /* ---------- Active session ---------- */

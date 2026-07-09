@@ -44,10 +44,25 @@ export function Subscribe() {
   async function handleSubscribe(plan: SubscriptionPlanName) {
     setSubError(null);
     setSubscribing(plan);
+
+    // iOS Safari blocks window.location changes that happen after an awaited network call -
+    // it no longer treats them as a direct result of the tap. Opening the destination tab
+    // synchronously, right now, then pointing it at the checkout URL once we have it, sidesteps
+    // that (the tab handle itself was opened as a trusted direct user action).
+    const checkoutTab = window.open("about:blank", "_blank");
+
     try {
       const { authorization_url } = await api.initializeSubscription(plan);
-      window.location.href = authorization_url;
+      if (checkoutTab) {
+        checkoutTab.location.href = authorization_url;
+      } else {
+        // Popup got blocked anyway (e.g. user has strict pop-up settings) - fall back to an
+        // in-place redirect, which at least works on browsers that don't have this quirk.
+        window.location.href = authorization_url;
+      }
+      setSubscribing(null);
     } catch (err) {
+      checkoutTab?.close();
       setSubError(err instanceof ApiError ? err.message : "Couldn't start checkout.");
       setSubscribing(null);
     }
