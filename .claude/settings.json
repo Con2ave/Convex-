@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"../.venv/Scripts/python.exe\" -m pytest tests/test_study_sessions.py -q --tb=short -p no:cacheprovider --log-cli-level=CRITICAL)",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)",
+      "Bash(npm -v)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(\"../.venv/Scripts/python.exe\" -m alembic revision --autogenerate -m \"add reward ledger and redemptions tables\")",
+      "Bash(\"../.venv/Scripts/python.exe\" -m uvicorn app.main:app --host 127.0.0.1 --port 8020)",
+      "Bash(echo \"backend PID:$!\")",
+      "Bash(curl -sf http://127.0.0.1:8020/health)",
+      "Bash(break)",
+      "Bash(curl -s http://127.0.0.1:8020/openapi.json)",
+      "Bash(../.venv/Scripts/python.exe -c ' *)",
+      "Bash(\"../.venv/Scripts/python.exe\" -m alembic revision --autogenerate -m \"switch to Knowledge Points economy with tiered redemption\")",
+      "Bash(../.venv/Scripts/python.exe -m pytest tests/test_study_sessions.py -q)",
+      "Bash(../.venv/Scripts/python.exe -m pytest tests/test_rewards.py -q)",
+      "Bash(../.venv/Scripts/python.exe -m pytest -q)"
+    ]
+  }
+}

@@ -25,8 +25,13 @@ class User(Base):
 
     # Relationships
     refresh_tokens: Mapped[List["UserRefreshToken"]] = relationship(
-        "UserRefreshToken", 
-        back_populates="user", 
+        "UserRefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    study_sessions: Mapped[List["StudySession"]] = relationship(
+        "StudySession",
+        back_populates="user",
         cascade="all, delete-orphan"
     )
 
