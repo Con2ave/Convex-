@@ -70,10 +70,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Configure CORS (Cross-Origin Resource Sharing)
+# Configure CORS (Cross-Origin Resource Sharing) - locked to the configured frontend origin(s),
+# set via the ALLOWED_ORIGINS env var (comma-separated for previews/multiple deployments).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production (e.g. settings.ALLOWED_ORIGINS)
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

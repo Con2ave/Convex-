@@ -1,11 +1,10 @@
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import pool
-from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 # Dynamically import settings and metadata Base
 from app.core.config import settings
+from app.core.database import engine
 from app.models import Base
 
 # This is the Alembic Config object, which provides
@@ -17,8 +16,9 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the sqlalchemy database URL dynamically from app settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Set the sqlalchemy database URL for --sql/offline mode only - online mode below reuses
+# app.core.database.engine directly so driver/SSL normalization stays in one place.
+config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URL)
 
 # Expose target metadata to support --autogenerate
 target_metadata = Base.metadata
@@ -56,23 +56,10 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
-
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    # Create an async database engine from settings configuration dict
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    async with connectable.connect() as connection:
+    """Run migrations in 'online' mode, reusing the app's own engine (same URL
+    normalization, same SSL/connect_args handling for whichever DB is configured)."""
+    async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
 
 
 if context.is_offline_mode():

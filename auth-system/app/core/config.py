@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Optional
 from pydantic import EmailStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -64,6 +65,10 @@ class Settings(BaseSettings):
     # Where Paystack redirects the browser after a subscription payment attempt.
     FRONTEND_BASE_URL: str = "http://localhost:5173"
 
+    # CORS: comma-separated list of origins allowed to call this API (the deployed frontend
+    # URL(s)). Defaults to the local Vite dev server so local dev keeps working unconfigured.
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+
     @property
     def PAYSTACK_CONFIGURED(self) -> bool:
         return bool(self.PAYSTACK_SECRET_KEY)
@@ -71,6 +76,28 @@ class Settings(BaseSettings):
     @property
     def IS_TESTING(self) -> bool:
         return self.ENVIRONMENT == "testing"
+
+    @property
+    def CORS_ORIGINS(self) -> list[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def SQLALCHEMY_DATABASE_URL(self) -> str:
+        """DATABASE_URL, normalized for the async drivers this app actually uses.
+
+        Most hosted Postgres providers (Neon, Render, Supabase, Heroku-style) hand out bare
+        postgres:// or postgresql:// URLs with a sslmode=require query param - that's meant for
+        psycopg2, not asyncpg. Accept whatever they give us and adapt it rather than making
+        deploy-time config a source of copy-paste errors.
+        """
+        url = self.DATABASE_URL
+        if url.startswith("postgres://"):
+            url = "postgresql+asyncpg://" + url[len("postgres://"):]
+        elif url.startswith("postgresql://"):
+            url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+        # asyncpg takes SSL as a connect kwarg (see app.core.database), not a URL query param.
+        url = re.sub(r"[?&]sslmode=[^&]*", "", url)
+        return url
 
 # Instantiate settings to expose to the rest of the application
 settings = Settings()
