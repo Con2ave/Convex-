@@ -4,6 +4,8 @@ import * as api from "../api/client";
 import { ApiError } from "../api/client";
 import type { SessionCheckResponse, SessionStatus, StudySessionDetail } from "../api/types";
 import { formatClock } from "../utils/format";
+import { AmbientSound } from "../components/AmbientSound";
+import { SandTimer } from "../components/SandTimer";
 
 const HEARTBEAT_INTERVAL_MS = 20_000; // must stay under the backend's grace window (default 45s)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
@@ -166,10 +168,14 @@ export function ActiveSession() {
             </span>
           </div>
 
+          <AmbientSound />
+
           {error && <div className="banner banner-error">{error}</div>}
 
           <div className="timer">{formatClock(displaySeconds)}</div>
           <p className="timer-caption">Verified minutes — server clock, not yours</p>
+
+          <SandTimer elapsedSeconds={displaySeconds} active={status === "active"} />
 
           {pendingCheck && status === "active" && (
             <div className="check-card">

@@ -218,3 +218,54 @@ export function MailIcon({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+export function RainIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M7 13a4.5 4.5 0 0 1 .7-8.94A5.5 5.5 0 0 1 18 6.2 4 4 0 0 1 17 14H7Z" />
+      <line x1="8" y1="17" x2="7" y2="19.5" />
+      <line x1="12.5" y1="17" x2="11.5" y2="19.5" />
+      <line x1="17" y1="17" x2="16" y2="19.5" />
+    </svg>
+  );
+}
+
+export function ForestIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M9 3 4.5 10h2.3L3 17h7.5V3Z" />
+      <path d="M15.5 6 11.5 12.5h2L10 20h9l-3.7-7.5h2Z" />
+      <line x1="10" y1="17" x2="10" y2="21" />
+    </svg>
+  );
+}
+
+export function WaveIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M3 9c1.5-1.4 3-1.4 4.5 0s3 1.4 4.5 0 3-1.4 4.5 0 3 1.4 4.5 0" />
+      <path d="M3 14.5c1.5-1.4 3-1.4 4.5 0s3 1.4 4.5 0 3-1.4 4.5 0 3 1.4 4.5 0" />
+      <path d="M3 20c1.5-1.4 3-1.4 4.5 0s3 1.4 4.5 0 3-1.4 4.5 0 3 1.4 4.5 0" />
+    </svg>
+  );
+}
+
+export function MuteIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <line x1="16" y1="9" x2="21" y2="15" />
+      <line x1="21" y1="9" x2="16" y2="15" />
+    </svg>
+  );
+}
+
+export function VolumeIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M19 6a8.5 8.5 0 0 1 0 12" />
+    </svg>
+  );
+}
