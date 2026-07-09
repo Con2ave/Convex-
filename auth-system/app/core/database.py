@@ -1,16 +1,25 @@
 from typing import AsyncGenerator
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
 
-# Determine if we are using SQLite to configure check_same_thread if needed
-is_sqlite = settings.DATABASE_URL.startswith("sqlite")
-connect_args = {"check_same_thread": False} if is_sqlite else {}
+db_url = settings.SQLALCHEMY_DATABASE_URL
+is_sqlite = db_url.startswith("sqlite")
+is_postgres = db_url.startswith("postgresql")
+
+# SQLite needs check_same_thread off for async use; hosted Postgres (Neon, Render, Supabase,
+# ...) requires SSL and won't accept plaintext connections - local Postgres typically doesn't.
+connect_args = {}
+if is_sqlite:
+    connect_args = {"check_same_thread": False}
+elif is_postgres and urlparse(db_url).hostname not in ("localhost", "127.0.0.1"):
+    connect_args = {"ssl": "require"}
 
 # Create the async db engine
 # echo=True can be enabled for SQL query profiling in development/debugging
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     connect_args=connect_args,
     future=True,
     echo=False

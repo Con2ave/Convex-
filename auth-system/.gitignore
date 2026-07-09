@@ -123,5 +123,3 @@ logs/
 .ipynb_checkpoints/
 *.bak
 *.tmp
-
-tests

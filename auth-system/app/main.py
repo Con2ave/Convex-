@@ -13,6 +13,9 @@ from app.core import security
 from app.core.database import get_async_db, async_session_maker
 from app.api.auth import router as auth_router
 from app.api.users import user_router, admin_router
+from app.api.study_sessions import router as study_sessions_router
+from app.api.rewards import router as rewards_router
+from app.api.subscriptions import router as subscriptions_router
 from app.core.limiter import limiter
 from app import crud
 
@@ -58,7 +61,7 @@ async def lifespan(app: FastAPI):
 # Instantiate app
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="A production-ready secure authentication and authorization system built with FastAPI.",
+    description="ConVex API - study session tracking, anti-cheat verification, and a points rewards engine.",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -67,10 +70,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Configure CORS (Cross-Origin Resource Sharing)
+# Configure CORS (Cross-Origin Resource Sharing) - locked to the configured frontend origin(s),
+# set via the ALLOWED_ORIGINS env var (comma-separated for previews/multiple deployments).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production (e.g. settings.ALLOWED_ORIGINS)
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,6 +93,9 @@ async def generic_exception_handler(request: Request, exc: Exception):
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(admin_router)
+app.include_router(study_sessions_router)
+app.include_router(rewards_router)
+app.include_router(subscriptions_router)
 
 # Healthcheck base endpoint
 @app.get("/health", tags=["Utilities"])

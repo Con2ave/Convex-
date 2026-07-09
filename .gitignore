@@ -1,0 +1,47 @@
+# ========================
+# VIRTUAL ENVIRONMENTS
+# ========================
+.venv/
+venv/
+env/
+ENV/
+
+# ========================
+# CLAUDE CODE
+# ========================
+# Local, machine-specific settings - shared settings.json stays committed.
+.claude/settings.local.json
+
+# ========================
+# IDE & EDITOR FILES
+# ========================
+.vscode/
+*.code-workspace
+.idea/
+*.iml
+*.iws
+*.swp
+*.swo
+*~
+
+# ========================
+# OPERATING SYSTEM FILES
+# ========================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ========================
+# LOGS
+# ========================
+*.log
+logs/
+*.out
