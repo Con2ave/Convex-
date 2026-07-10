@@ -23,6 +23,12 @@ SESSION_VERIFIED_REASON = "session_verified"
 REDEMPTION_REASON = "redemption:momo"
 REDEMPTION_REFUND_REASON = "redemption_refund:momo"
 
+# Guided sessions only (see app.services.study_session.end_session). Purely additive on top of
+# the KP formula below - clearing your committed study time is worth a flat bonus regardless of
+# how much base KP the session itself earned.
+TARGET_TIME_BONUS_KP = 2
+TARGET_TIME_BONUS_REASON = "target_time_bonus"
+
 # A "success" transfer status in Paystack test mode comes back immediately, but production
 # transfers confirm asynchronously - poll this many times, this far apart, before giving up
 # and leaving the redemption "pending" for later reconciliation.
@@ -120,6 +126,20 @@ async def award_session_points(
         f"(base={base_kp}, bonus={bonus_kp}, streak={streak_days}d x{multiplier})."
     )
     return kp
+
+
+async def award_target_time_bonus(db: AsyncSession, user_id: int, session_id: int) -> int:
+    """Flat +2 KP for clearing a guided session's target study time. Idempotent per session,
+    same guard pattern as award_session_points."""
+    if await crud.reward.has_ledger_entry_for_session(db, session_id, TARGET_TIME_BONUS_REASON):
+        logger.warning(f"Skipped duplicate target-time bonus for session {session_id} (already credited).")
+        return 0
+
+    await crud.reward.create_ledger_entry(
+        db, user_id=user_id, points=TARGET_TIME_BONUS_KP, reason=TARGET_TIME_BONUS_REASON, session_id=session_id
+    )
+    logger.info(f"Awarded {TARGET_TIME_BONUS_KP} KP target-time bonus to user {user_id} for session {session_id}.")
+    return TARGET_TIME_BONUS_KP
 
 
 async def get_balance(db: AsyncSession, user: User) -> int:

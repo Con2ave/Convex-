@@ -269,3 +269,33 @@ export function VolumeIcon({ size = 20, ...props }: IconProps) {
     </svg>
   );
 }
+
+export function UploadIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M12 15V4" />
+      <polyline points="7.5 8.5 12 4 16.5 8.5" />
+      <path d="M4.5 15v3.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V15" />
+    </svg>
+  );
+}
+
+export function DocumentIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M7 3.5h7L18.5 8v12A1.5 1.5 0 0 1 17 21.5H7A1.5 1.5 0 0 1 5.5 20V5A1.5 1.5 0 0 1 7 3.5Z" />
+      <polyline points="14 3.5 14 8.5 18.5 8.5" />
+      <line x1="8.5" y1="13" x2="15" y2="13" />
+      <line x1="8.5" y1="16.5" x2="13" y2="16.5" />
+    </svg>
+  );
+}
+
+export function BookIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...base(size, props)}>
+      <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5Z" />
+      <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5Z" />
+    </svg>
+  );
+}

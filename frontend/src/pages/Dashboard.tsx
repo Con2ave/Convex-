@@ -9,7 +9,8 @@ import { DAILY_CAP_MINUTES, SUBJECTS, WEEKLY_CAP_MINUTES } from "../constants";
 import { BottomNav } from "../components/BottomNav";
 import { MenuSheet } from "../components/MenuSheet";
 import { SessionListRow } from "../components/SessionListRow";
-import { BellIcon, MenuIcon, SearchIcon, SlidersIcon } from "../components/icons";
+import { StartSessionSheet } from "../components/StartSessionSheet";
+import { BellIcon, BookIcon, ChevronRightIcon, MenuIcon, SearchIcon, SlidersIcon } from "../components/icons";
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export function Dashboard() {
   const [showPicker, setShowPicker] = useState(false);
   const [subject, setSubject] = useState("");
   const [showMenu, setShowMenu] = useState(false);
+  const [showStartSheet, setShowStartSheet] = useState(false);
 
   useEffect(() => {
     api
@@ -89,6 +91,7 @@ export function Dashboard() {
         </div>
 
         {showMenu && <MenuSheet onClose={() => setShowMenu(false)} />}
+        {showStartSheet && <StartSessionSheet onClose={() => setShowStartSheet(false)} />}
 
         <h1 className="display-heading">
           Hello, {user?.username}
@@ -135,6 +138,23 @@ export function Dashboard() {
               </button>
             ))}
           </div>
+        )}
+
+        {!openSession && (
+          <button
+            className="list-row"
+            style={{ marginBottom: "1.3rem" }}
+            onClick={() => setShowStartSheet(true)}
+          >
+            <span className="icon-tile lime" style={{ width: 44, height: 44 }}>
+              <BookIcon size={20} />
+            </span>
+            <span className="list-row-main">
+              <div className="list-row-title">Start with lecture material</div>
+              <div className="list-row-sub">Upload notes, get quizzed when you're done</div>
+            </span>
+            <ChevronRightIcon size={18} className="list-row-chevron" />
+          </button>
         )}
 
         <div className="stat-row" style={{ marginBottom: "1rem" }}>

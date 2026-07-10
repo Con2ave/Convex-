@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Text, func
+from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Text, JSON, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, List
@@ -27,6 +27,12 @@ class StudySession(Base):
     summary_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     flag_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # Guided sessions only (started via /start-guided) - null for ordinary instant-start sessions.
+    # target_time_met is computed once at end_session from raw accumulated_seconds, independent
+    # of the reward-capped verified_minutes, since it measures actual commitment, not KP eligibility.
+    target_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    target_time_met: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -48,6 +54,12 @@ class StudySession(Base):
         back_populates="session",
         cascade="all, delete-orphan",
         order_by="SessionEvent.occurred_at"
+    )
+    quiz: Mapped[Optional["SessionQuiz"]] = relationship(
+        "SessionQuiz",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        uselist=False
     )
 
 
@@ -82,3 +94,34 @@ class SessionEvent(Base):
 
     # Relationships
     session: Mapped["StudySession"] = relationship("StudySession", back_populates="events")
+
+
+class SessionQuiz(Base):
+    """AI-generated comprehension quiz for a guided (lecture-material) study session.
+
+    Generation happens in a background task after the session starts (see
+    app.services.study_session.start_guided_session), so status starts at "generating" and the
+    row is filled in later - the frontend polls GET /study-sessions/{id}/quiz until it's "ready".
+    """
+    __tablename__ = "session_quizzes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="generating", nullable=False)
+    # generating / ready / failed
+
+    # List of exactly 10 {"question": str, "options": [4 strings], "correct_index": int} once ready.
+    # correct_index is never serialized to the client until after grading (see schemas/quiz.py).
+    questions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    answers: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    session: Mapped["StudySession"] = relationship("StudySession", back_populates="quiz")

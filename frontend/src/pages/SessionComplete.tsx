@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import * as api from "../api/client";
 import { ApiError } from "../api/client";
 import type { StudySessionDetail } from "../api/types";
@@ -7,6 +7,7 @@ import { CheckIcon, FlagIcon } from "../components/icons";
 
 export function SessionComplete() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const location = useLocation();
   const stateDetail = (location.state as { detail?: StudySessionDetail } | null)?.detail;
 
@@ -94,6 +95,45 @@ export function SessionComplete() {
             <span>Checks passed</span>
             <span className="mono">{passedChecks} / {totalChecks}</span>
           </div>
+        )}
+
+        {detail.target_minutes !== null && (
+          <>
+            <div className="complete-row">
+              <span>Target time ({detail.target_minutes} min)</span>
+              <span className="mono">{detail.target_time_met ? "Cleared (+2 KP)" : "Not reached"}</span>
+            </div>
+
+            {detail.quiz?.status === "generating" && (
+              <div className="banner banner-info">Your quiz is still being generated — check back in a moment.</div>
+            )}
+            {detail.quiz?.status === "failed" && (
+              <div className="banner banner-info">
+                We couldn't generate a quiz from your material this time. Your studying and Knowledge Points are unaffected.
+              </div>
+            )}
+            {detail.quiz?.status === "ready" && detail.quiz.submitted_at === null && (
+              <button
+                className="btn btn-dark btn-block"
+                style={{ marginTop: "0.4rem", marginBottom: "1rem" }}
+                onClick={() => navigate(`/session/${id}/quiz`)}
+              >
+                Take the quiz
+              </button>
+            )}
+            {detail.quiz?.status === "ready" && detail.quiz.submitted_at !== null && (
+              <div className="complete-row">
+                <span>Quiz score</span>
+                <span className="mono">{detail.quiz.score} / 10 ({detail.quiz.passed ? "Passed" : "Failed"})</span>
+              </div>
+            )}
+            {detail.is_successful !== null && (
+              <div className="complete-row">
+                <span>Session marked</span>
+                <span className="mono">{detail.is_successful ? "Successful" : "Not successful"}</span>
+              </div>
+            )}
+          </>
         )}
 
         {detail.summary_text && <div className="complete-summary">&ldquo;{detail.summary_text}&rdquo;</div>}

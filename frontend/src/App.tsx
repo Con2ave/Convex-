@@ -9,6 +9,7 @@ import { History } from "./pages/History";
 import { Profile } from "./pages/Profile";
 import { ActiveSession } from "./pages/ActiveSession";
 import { SessionComplete } from "./pages/SessionComplete";
+import { SessionQuiz } from "./pages/SessionQuiz";
 import { Subscribe } from "./pages/Subscribe";
 import { SubscribeCallback } from "./pages/SubscribeCallback";
 import { Settings } from "./pages/Settings";
@@ -91,6 +92,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SessionComplete />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/session/:id/quiz"
+              element={
+                <ProtectedRoute>
+                  <SessionQuiz />
                 </ProtectedRoute>
               }
             />

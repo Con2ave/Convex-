@@ -3,21 +3,25 @@ import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.database import async_session_maker
 from app import crud
 from app.models.user import User
 from app.models.study_session import StudySession, SessionCheck
 from app.schemas.study_session import StudySessionStart, CheckRespondRequest, EndSessionRequest
 from app.services import reward as reward_service
+from app.services import ai_client
+from app.services.text_extraction import extract_text, TextExtractionError
 
 logger = logging.getLogger(__name__)
 
 ATTENTION_PROMPT = "Still there? Tap to confirm you're studying."
 RECALL_PROMPT = "In one sentence, what are you studying right now?"
 OPEN_STATUSES = ("active", "paused")
+MIN_TARGET_MINUTES = 45
 
 
 def _now() -> datetime:
@@ -55,6 +59,86 @@ async def start_session(db: AsyncSession, user: User, start_in: StudySessionStar
     await crud.study_session.log_event(db, session.id, "start")
     logger.info(f"Study session {session.id} started for user {user.id}.")
     return session
+
+
+async def start_guided_session(
+    db: AsyncSession,
+    user: User,
+    background_tasks: BackgroundTasks,
+    subject_tag: str,
+    target_minutes: int,
+    material: UploadFile,
+) -> StudySession:
+    """Start a session backed by uploaded lecture material: a 10-question quiz is generated in
+    the background and served once the session ends (see app.services.quiz). Kept as a separate
+    function from start_session rather than merged - the two flows diverge in sequencing (this
+    one validates a file and extracts text before anything is created) and instant-start's own
+    tests shouldn't have to account for a code path they never exercise.
+    """
+    if target_minutes < MIN_TARGET_MINUTES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target study time must be at least {MIN_TARGET_MINUTES} minutes."
+        )
+
+    existing = await crud.study_session.get_open_session_for_user(db, user.id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You already have an active study session. End it before starting a new one."
+        )
+
+    if not settings.AI_CONFIGURED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Guided sessions with AI-generated quizzes aren't available right now."
+        )
+
+    try:
+        material_text = await extract_text(material)
+    except TextExtractionError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+    now = _now()
+    session = await crud.study_session.create_session(
+        db,
+        user_id=user.id,
+        subject_tag=subject_tag,
+        next_check_at=now + _next_check_delay(),
+        target_minutes=target_minutes,
+    )
+    quiz = await crud.study_session.create_quiz(db, session.id, source_filename=material.filename)
+    # session was fetched (eager-loading quiz) before this row existed, so its in-memory quiz
+    # attribute is still stale None - set it directly rather than re-querying again.
+    session.quiz = quiz
+    await crud.study_session.log_event(db, session.id, "start", detail="guided")
+
+    background_tasks.add_task(_generate_quiz_task, session.id, material_text, subject_tag)
+
+    logger.info(f"Guided study session {session.id} started for user {user.id}; quiz generating.")
+    return session
+
+
+async def _generate_quiz_task(session_id: int, material_text: str, subject_tag: str) -> None:
+    """Runs after the start-guided response has already been sent, so it opens its own DB
+    session rather than reusing the (by-then-closed) request-scoped one. Never raises past this
+    point - a failed background task must not crash the process; it just leaves the quiz
+    "failed" for the user to see, and the study session itself is entirely unaffected either way.
+    """
+    async with async_session_maker() as db:
+        quiz = await crud.study_session.get_quiz_by_session_id(db, session_id)
+        if not quiz:
+            logger.error(f"Quiz row for session {session_id} vanished before generation ran.")
+            return
+        try:
+            questions = await ai_client.generate_quiz(material_text, subject_tag)
+            quiz.questions = questions
+            quiz.status = "ready"
+            logger.info(f"Quiz for session {session_id} generated successfully.")
+        except ai_client.AIQuizError as e:
+            quiz.status = "failed"
+            logger.error(f"Quiz generation failed for session {session_id}: {e}")
+        await crud.study_session.save_quiz(db, quiz)
 
 
 async def get_owned_session(db: AsyncSession, session_id: int, user: User) -> StudySession:
@@ -283,6 +367,12 @@ async def end_session(db: AsyncSession, session: StudySession, end_in: EndSessio
         session.status = "completed"
     session.ended_at = now
 
+    if session.target_minutes is not None:
+        # Raw elapsed time, not the reward-capped verified_minutes - this is about actual time
+        # spent, independent of the daily/weekly KP cap. Computed even for a flagged session (an
+        # honest label), but the bonus below only ever pays out for a completed one.
+        session.target_time_met = (session.accumulated_seconds // 60) >= session.target_minutes
+
     session = await crud.study_session.save_session(db, session)
 
     if session.status == "completed":
@@ -292,6 +382,8 @@ async def end_session(db: AsyncSession, session: StudySession, end_in: EndSessio
         await reward_service.award_session_points(
             db, session.user_id, session.id, session.verified_minutes, is_perfect
         )
+        if session.target_time_met:
+            await reward_service.award_target_time_bonus(db, session.user_id, session.id)
 
     logger.info(
         f"Study session {session.id} ended for user {session.user_id}: "

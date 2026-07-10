@@ -15,6 +15,8 @@ import type {
   SubscriptionPlanName,
   InitializeSubscriptionResponse,
   SubscriptionResponse,
+  QuizOut,
+  QuizResultOut,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -92,18 +94,22 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   form?: Record<string, string>;
+  formData?: FormData;
   auth?: boolean;
   /** Internal: prevents infinite refresh loops. */
   _retried?: boolean;
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, form, auth = true, _retried = false } = opts;
+  const { method = "GET", body, form, formData, auth = true, _retried = false } = opts;
 
   const headers: Record<string, string> = {};
   let requestBody: BodyInit | undefined;
 
-  if (form) {
+  if (formData) {
+    // No Content-Type here - the browser sets the multipart boundary itself.
+    requestBody = formData;
+  } else if (form) {
     headers["Content-Type"] = "application/x-www-form-urlencoded";
     requestBody = new URLSearchParams(form).toString();
   } else if (body !== undefined) {
@@ -190,6 +196,18 @@ export function startSession(subject_tag: string | null): Promise<StudySessionRe
   return request("/study-sessions/start", { method: "POST", body: { subject_tag } });
 }
 
+export function startGuidedSession(input: {
+  subject_tag: string;
+  target_minutes: number;
+  material: File;
+}): Promise<StudySessionResponse> {
+  const formData = new FormData();
+  formData.append("subject_tag", input.subject_tag);
+  formData.append("target_minutes", String(input.target_minutes));
+  formData.append("material", input.material);
+  return request("/study-sessions/start-guided", { method: "POST", formData });
+}
+
 export function sendHeartbeat(id: number): Promise<HeartbeatResponse> {
   return request(`/study-sessions/${id}/heartbeat`, { method: "POST" });
 }
@@ -215,6 +233,14 @@ export function respondToCheck(
 
 export function endSession(id: number, summary_text: string): Promise<StudySessionDetail> {
   return request(`/study-sessions/${id}/end`, { method: "POST", body: { summary_text } });
+}
+
+export function getQuiz(sessionId: number): Promise<QuizOut> {
+  return request(`/study-sessions/${sessionId}/quiz`);
+}
+
+export function submitQuiz(sessionId: number, answers: number[]): Promise<QuizResultOut> {
+  return request(`/study-sessions/${sessionId}/quiz/submit`, { method: "POST", body: { answers } });
 }
 
 // ----------------- Rewards -----------------

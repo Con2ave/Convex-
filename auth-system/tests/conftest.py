@@ -11,6 +11,9 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_auth_system.db"
 # Force the mocked payout/payment path regardless of what's in the developer's real .env -
 # tests must never depend on (or accidentally exercise) a real Paystack key.
 os.environ["PAYSTACK_SECRET_KEY"] = ""
+# Same reasoning for AI quiz generation - tests always mock app.services.ai_client.generate_quiz
+# directly and must never depend on (or accidentally exercise) a real Gemini key.
+os.environ["GEMINI_API_KEY"] = ""
 
 # Import app, settings, and db dependencies
 from app.main import app

@@ -69,9 +69,20 @@ class Settings(BaseSettings):
     # URL(s)). Defaults to the local Vite dev server so local dev keeps working unconfigured.
     ALLOWED_ORIGINS: str = "http://localhost:5173"
 
+    # AI quiz generation for guided study sessions (app.services.ai_client). Using Gemini's free
+    # tier for now, isolated behind one function so swapping to Claude later doesn't touch
+    # anything else. Left unset in dev: start_guided_session fails closed with 503 rather than
+    # faking a quiz - unlike a mocked payout, a fabricated quiz would actively mislead a student.
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
     @property
     def PAYSTACK_CONFIGURED(self) -> bool:
         return bool(self.PAYSTACK_SECRET_KEY)
+
+    @property
+    def AI_CONFIGURED(self) -> bool:
+        return bool(self.GEMINI_API_KEY)
 
     @property
     def IS_TESTING(self) -> bool:

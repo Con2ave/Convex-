@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, computed_field
+
+from app.schemas.quiz import QuizStatus
 
 
 class StudySessionStart(BaseModel):
@@ -29,7 +31,24 @@ class StudySessionResponse(BaseModel):
     verified_minutes: int
     flag_reason: Optional[str] = None
 
+    # Guided-session fields - null for ordinary instant-start sessions.
+    target_minutes: Optional[int] = None
+    target_time_met: Optional[bool] = None
+    quiz: Optional[QuizStatus] = None
+
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def is_successful(self) -> Optional[bool]:
+        """True only once both halves of a guided session are in: the time target was met AND
+        the quiz was passed. None if this isn't a guided session, the session hasn't ended yet,
+        or the quiz hasn't been graded yet - not a hard "no"."""
+        if self.target_minutes is None or self.target_time_met is None:
+            return None
+        if self.quiz is None or self.quiz.passed is None:
+            return None
+        return bool(self.target_time_met and self.quiz.passed)
 
 
 class StudySessionDetail(StudySessionResponse):

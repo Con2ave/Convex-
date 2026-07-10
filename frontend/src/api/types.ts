@@ -31,6 +31,15 @@ export interface SessionCheckResponse {
   passed: boolean | null;
 }
 
+export type QuizGenerationStatus = "generating" | "ready" | "failed";
+
+export interface QuizStatus {
+  status: QuizGenerationStatus;
+  passed: boolean | null;
+  score: number | null;
+  submitted_at: string | null;
+}
+
 export interface StudySessionResponse {
   id: number;
   subject_tag: string | null;
@@ -40,11 +49,40 @@ export interface StudySessionResponse {
   accumulated_seconds: number;
   verified_minutes: number;
   flag_reason: string | null;
+
+  // Guided-session fields - null for ordinary instant-start sessions.
+  target_minutes: number | null;
+  target_time_met: boolean | null;
+  quiz: QuizStatus | null;
+  is_successful: boolean | null;
 }
 
 export interface StudySessionDetail extends StudySessionResponse {
   summary_text: string | null;
   checks: SessionCheckResponse[];
+}
+
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+}
+
+export interface QuizOut {
+  status: QuizGenerationStatus;
+  subject_tag: string | null;
+  questions: QuizQuestion[] | null;
+}
+
+export interface QuizSubmitRequest {
+  answers: number[];
+}
+
+export interface QuizResultOut {
+  score: number;
+  total: number;
+  passed: boolean;
+  correct_answers: number[];
+  is_successful: boolean | null;
 }
 
 export interface HeartbeatResponse {
