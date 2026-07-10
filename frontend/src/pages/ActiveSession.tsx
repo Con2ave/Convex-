@@ -6,6 +6,7 @@ import type { SessionCheckResponse, SessionStatus, StudySessionDetail } from "..
 import { formatClock } from "../utils/format";
 import { AmbientSound } from "../components/AmbientSound";
 import { SandTimer } from "../components/SandTimer";
+import { ForestBackdrop } from "../components/ForestBackdrop";
 
 const HEARTBEAT_INTERVAL_MS = 20_000; // must stay under the backend's grace window (default 45s)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
@@ -140,6 +141,8 @@ export function ActiveSession() {
     return (
       <div className="app-shell">
         <div className="session-screen">
+          <ForestBackdrop />
+          <div className="session-vignette" />
           <div className="app-column">
             {error ? <div className="banner banner-error">{error}</div> : <p className="text-soft">Loading…</p>}
           </div>
@@ -158,6 +161,7 @@ export function ActiveSession() {
   return (
     <div className="app-shell">
       <div className="session-screen" style={{ flex: 1, width: "100%" }}>
+        <ForestBackdrop />
         <div className="session-vignette" />
         <div className="app-column">
           <div className="session-top">
