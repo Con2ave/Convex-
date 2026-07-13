@@ -22,7 +22,10 @@ class Settings(BaseSettings):
     JWT_REFRESH_SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # Rotated on every /auth/refresh call (see app.services.auth.refresh_access_token), so this
+    # is a sliding window, not a hard cap - a user who opens the app at least this often stays
+    # signed in indefinitely without re-entering their password.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 60
 
     # Database Configuration
     DATABASE_URL: str

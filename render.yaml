@@ -24,8 +24,10 @@ services:
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "15"
+      # Rotated on every /auth/refresh call - a sliding window, not a hard cap. A user who opens
+      # the app at least this often stays signed in without re-entering their password.
       - key: REFRESH_TOKEN_EXPIRE_DAYS
-        value: "7"
+        value: "60"
 
       # Paste in the connection string from your Postgres provider (Neon, etc.) - postgres://
       # or postgresql://, with or without sslmode=require, all accepted as-is.
