@@ -64,7 +64,12 @@ export function SignIn() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+          <button
+            className="btn btn-primary btn-block"
+            type="submit"
+            disabled={submitting}
+            style={{ marginTop: "0.8rem" }}
+          >
             {submitting ? "Signing in…" : "Continue"}
           </button>
         </form>
