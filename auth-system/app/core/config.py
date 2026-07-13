@@ -77,7 +77,11 @@ class Settings(BaseSettings):
     # anything else. Left unset in dev: start_guided_session fails closed with 503 rather than
     # faking a quiz - unlike a mocked payout, a fabricated quiz would actively mislead a student.
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    # "gemini-2.0-flash" returns 429 RESOURCE_EXHAUSTED with a hard 0 free-tier quota for newer
+    # API keys/projects - Google appears to have stopped granting free quota on that pinned model
+    # name. The rolling "-latest" alias (currently pointing at the 2.5 flash generation) does have
+    # free quota and was verified end-to-end (including structured JSON output) against a real key.
+    GEMINI_MODEL: str = "gemini-flash-latest"
 
     @property
     def PAYSTACK_CONFIGURED(self) -> bool:
