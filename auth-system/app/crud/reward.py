@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import select, func
+from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.reward import RewardLedgerEntry, Redemption
 from app.models.study_session import StudySession
+from app.models.user import User
 
 # ----------------- Ledger -----------------
 
@@ -67,6 +69,39 @@ async def get_completed_session_end_dates(
         query = query.where(StudySession.id != exclude_session_id)
     result = await db.execute(query)
     return [row[0] for row in result.all() if row[0] is not None]
+
+
+# ----------------- Leaderboard -----------------
+
+async def get_points_leaderboard(db: AsyncSession, limit: int = 50) -> List[Row]:
+    """Top point-holders, highest net balance first. The HAVING clause (plus the implicit INNER
+    JOIN) naturally excludes users with no ledger activity or a fully-redeemed-to-zero balance -
+    nothing to rank, nothing shown. Ties broken by username for deterministic ordering."""
+    points_sum = func.sum(RewardLedgerEntry.points)
+    result = await db.execute(
+        select(User.username, points_sum.label("points"))
+        .join(RewardLedgerEntry, RewardLedgerEntry.user_id == User.id)
+        .group_by(User.id, User.username)
+        .having(points_sum > 0)
+        .order_by(points_sum.desc(), User.username.asc())
+        .limit(limit)
+    )
+    return list(result.all())
+
+
+async def get_all_completed_session_end_dates(db: AsyncSession, since: datetime) -> List[Row]:
+    """Raw (user_id, username, ended_at) for every user's completed sessions since a given time -
+    the all-users counterpart to get_completed_session_end_dates above, used to batch-compute the
+    leaderboard streak ranking (app.services.leaderboard). Bucketing into per-day sets and
+    walking backward from today happens in Python once these raw rows are in hand, same as the
+    existing single-user streak calculation - kept portable across SQLite/Postgres by avoiding
+    any DATE()-style SQL function."""
+    result = await db.execute(
+        select(StudySession.user_id, User.username, StudySession.ended_at)
+        .join(User, User.id == StudySession.user_id)
+        .where(StudySession.status == "completed", StudySession.ended_at >= since)
+    )
+    return list(result.all())
 
 
 # ----------------- Redemptions -----------------

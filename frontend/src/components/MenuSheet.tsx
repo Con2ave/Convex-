@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ChevronRightIcon, HelpIcon, SettingsIcon } from "./icons";
+import { ChevronRightIcon, HelpIcon, SettingsIcon, TrophyIcon } from "./icons";
 
 interface MenuSheetProps {
   onClose: () => void;
@@ -36,6 +36,17 @@ export function MenuSheet({ onClose }: MenuSheetProps) {
           <span className="list-row-main">
             <div className="list-row-title">FAQ</div>
             <div className="list-row-sub">Questions? Get in touch</div>
+          </span>
+          <ChevronRightIcon size={18} className="list-row-chevron" />
+        </button>
+
+        <button className="list-row" onClick={() => go("/leaderboard")}>
+          <span className="icon-tile" style={{ width: 44, height: 44 }}>
+            <TrophyIcon size={20} />
+          </span>
+          <span className="list-row-main">
+            <div className="list-row-title">Leaderboard</div>
+            <div className="list-row-sub">See who's leading the pack</div>
           </span>
           <ChevronRightIcon size={18} className="list-row-chevron" />
         </button>

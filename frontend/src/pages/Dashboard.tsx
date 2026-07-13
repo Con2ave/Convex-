@@ -158,12 +158,16 @@ export function Dashboard() {
         )}
 
         <div className="stat-row" style={{ marginBottom: "1rem" }}>
-          <div className="card">
+          <button
+            className="card"
+            style={{ textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }}
+            onClick={() => navigate("/leaderboard")}
+          >
             <p className="stat-label">Streak</p>
             <p className="stat-value">
               {streakDays} {streakDays === 1 ? "day" : "days"}
             </p>
-          </div>
+          </button>
           <button
             className="card"
             style={{ textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit" }}

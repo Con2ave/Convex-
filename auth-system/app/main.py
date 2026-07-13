@@ -16,6 +16,7 @@ from app.api.users import user_router, admin_router
 from app.api.study_sessions import router as study_sessions_router
 from app.api.rewards import router as rewards_router
 from app.api.subscriptions import router as subscriptions_router
+from app.api.leaderboard import router as leaderboard_router
 from app.core.limiter import limiter
 from app import crud
 
@@ -96,6 +97,7 @@ app.include_router(admin_router)
 app.include_router(study_sessions_router)
 app.include_router(rewards_router)
 app.include_router(subscriptions_router)
+app.include_router(leaderboard_router)
 
 # Healthcheck base endpoint
 @app.get("/health", tags=["Utilities"])

@@ -10,6 +10,7 @@ import { Profile } from "./pages/Profile";
 import { ActiveSession } from "./pages/ActiveSession";
 import { SessionComplete } from "./pages/SessionComplete";
 import { SessionQuiz } from "./pages/SessionQuiz";
+import { Leaderboard } from "./pages/Leaderboard";
 import { Subscribe } from "./pages/Subscribe";
 import { SubscribeCallback } from "./pages/SubscribeCallback";
 import { Settings } from "./pages/Settings";
@@ -100,6 +101,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SessionQuiz />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/leaderboard"
+              element={
+                <ProtectedRoute>
+                  <Leaderboard />
                 </ProtectedRoute>
               }
             />

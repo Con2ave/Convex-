@@ -108,6 +108,16 @@ export interface RedemptionTier {
   kp_cost: number;
 }
 
+export interface PointsLeaderboardEntry {
+  username: string;
+  points: number;
+}
+
+export interface StreakLeaderboardEntry {
+  username: string;
+  streak_days: number;
+}
+
 export type MobileNetwork = "mtn" | "telecel" | "airteltigo";
 
 export interface RedeemRequest {

@@ -17,6 +17,8 @@ import type {
   SubscriptionResponse,
   QuizOut,
   QuizResultOut,
+  PointsLeaderboardEntry,
+  StreakLeaderboardEntry,
 } from "./types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -263,6 +265,16 @@ export function redeemPoints(redeem_in: RedeemRequest): Promise<RedemptionRespon
 
 export function getRedemptions(): Promise<RedemptionResponse[]> {
   return request("/rewards/redemptions");
+}
+
+// ----------------- Leaderboard -----------------
+
+export function getPointsLeaderboard(): Promise<PointsLeaderboardEntry[]> {
+  return request("/leaderboard/points");
+}
+
+export function getStreakLeaderboard(): Promise<StreakLeaderboardEntry[]> {
+  return request("/leaderboard/streaks");
 }
 
 // ----------------- Subscriptions -----------------
