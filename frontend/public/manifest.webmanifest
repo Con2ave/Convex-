@@ -1,0 +1,21 @@
+{
+  "name": "ConVex",
+  "short_name": "ConVex",
+  "description": "Study time, verified and rewarded.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf9f8",
+  "theme_color": "#7e14ff",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
