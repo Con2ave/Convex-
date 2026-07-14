@@ -180,6 +180,22 @@ export async function logout(): Promise<void> {
   }
 }
 
+export function forgotPassword(email: string): Promise<{ detail: string }> {
+  return request("/auth/forgot-password", { method: "POST", body: { email }, auth: false });
+}
+
+export function resetPassword(input: {
+  token: string;
+  new_password: string;
+  new_password_confirm: string;
+}): Promise<{ detail: string }> {
+  return request("/auth/reset-password", { method: "POST", body: input, auth: false });
+}
+
+export function verifyEmail(token: string): Promise<{ detail: string }> {
+  return request(`/auth/verify-email?token=${encodeURIComponent(token)}`, { auth: false });
+}
+
 export function getCurrentUser(): Promise<UserResponse> {
   return request("/users/me");
 }

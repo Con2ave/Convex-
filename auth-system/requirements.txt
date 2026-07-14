@@ -17,3 +17,4 @@ aiosqlite>=0.20.0
 asyncpg>=0.29.0
 google-genai>=1.0.0
 pypdf>=5.0.0
+aiosmtplib>=3.0.1

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,7 @@ from app.models.study_session import StudySession, SessionCheck
 from app.models.reward import RewardLedgerEntry
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.services import reward as reward_service
 from app.services.reward import _streak_multiplier
 
 TEST_USER_DATA = {
@@ -263,6 +265,38 @@ async def test_balance_is_per_user(client: AsyncClient, db_session: AsyncSession
 async def _seed_balance(db_session: AsyncSession, user_id: int, points: int) -> None:
     db_session.add(RewardLedgerEntry(user_id=user_id, points=points, reason="session_verified"))
     await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_redemption_lock_serializes_same_user_concurrent_calls():
+    """Directly exercises the per-user lock reward.redeem() holds for its full duration - this
+    is what prevents two concurrent redemption requests for the same user from both reading the
+    same pre-deduction balance and both passing the affordability check (double-spend)."""
+    user_id = 900001
+    order = []
+
+    async def hold_lock():
+        async with reward_service._redemption_locks[user_id]:
+            order.append("first-acquired")
+            await asyncio.sleep(0.05)
+            order.append("first-released")
+
+    async def try_acquire():
+        await asyncio.sleep(0.01)  # let the first task acquire first
+        async with reward_service._redemption_locks[user_id]:
+            order.append("second-acquired")
+
+    await asyncio.gather(hold_lock(), try_acquire())
+
+    assert order == ["first-acquired", "first-released", "second-acquired"]
+
+
+@pytest.mark.asyncio
+async def test_redemption_lock_is_per_user_not_global():
+    """Different users' redemptions must not block each other."""
+    lock_a = reward_service._redemption_locks[900002]
+    lock_b = reward_service._redemption_locks[900003]
+    assert lock_a is not lock_b
 
 
 @pytest.mark.asyncio

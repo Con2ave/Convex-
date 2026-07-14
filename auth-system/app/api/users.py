@@ -9,6 +9,7 @@ from app.schemas.user import UserResponse, UserUpdate, UserChangePassword
 from app.models.user import User
 from app.core import security
 from app import crud
+from app.services import auth as auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,19 +56,15 @@ async def update_profile(
     # Perform user update
     updated_user = await crud.user.update_user(db, current_user, user_in)
     
-    # If email changed, default is_verified back to False and mock verify re-trigger
+    # If email changed, default is_verified back to False and re-trigger verification
     if email_changed:
         updated_user.is_verified = False
         db.add(updated_user)
         await db.commit()
         await db.refresh(updated_user)
-        
-        verification_token = security.create_email_verification_token(updated_user.email)
-        logger.warning(
-            f"[MOCK EMAIL SERVICE] Re-verification email sent to changed address {updated_user.email}. "
-            f"Token: {verification_token}"
-        )
-        
+
+        await auth_service.send_verification_email(updated_user.email)
+
     return updated_user
 
 

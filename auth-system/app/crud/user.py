@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import select, delete, update
@@ -107,16 +108,26 @@ async def verify_user(db: AsyncSession, db_user: User) -> User:
 
 # ----------------- Refresh Token CRUD Operations -----------------
 
+def hash_refresh_token(token: str) -> str:
+    """One-way hash used for refresh-token storage - the DB holds this, never the raw JWT, so a
+    DB compromise alone (backup leak, SQLi elsewhere, insider access) doesn't hand over
+    ready-to-use bearer credentials for every user's session. The actual JWT is still returned
+    to the client as normal; only server-side storage changed. Exported (not a leading-underscore
+    helper) so callers that need to look a token up by its own knowledge of it - e.g. tests -
+    hash it the same way rather than duplicating this logic."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
 async def create_refresh_token(
-    db: AsyncSession, 
-    user_id: int, 
-    token: str, 
+    db: AsyncSession,
+    user_id: int,
+    token: str,
     expires_at: datetime
 ) -> UserRefreshToken:
-    """Link a newly issued JWT Refresh Token to the user in database."""
+    """Link a newly issued JWT Refresh Token to the user in database (stored as a hash - see
+    hash_refresh_token)."""
     db_token = UserRefreshToken(
         user_id=user_id,
-        token=token,
+        token=hash_refresh_token(token),
         expires_at=expires_at,
         is_revoked=False
     )
@@ -126,8 +137,9 @@ async def create_refresh_token(
     return db_token
 
 async def get_refresh_token(db: AsyncSession, token: str) -> Optional[UserRefreshToken]:
-    """Look up a stored Refresh Token instance."""
-    result = await db.execute(select(UserRefreshToken).where(UserRefreshToken.token == token))
+    """Look up a stored Refresh Token instance by the raw token - hashed the same way it was
+    stored (see hash_refresh_token)."""
+    result = await db.execute(select(UserRefreshToken).where(UserRefreshToken.token == hash_refresh_token(token)))
     return result.scalar_one_or_none()
 
 async def revoke_refresh_token(db: AsyncSession, db_token: UserRefreshToken) -> None:

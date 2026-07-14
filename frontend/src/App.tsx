@@ -4,6 +4,9 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SignIn } from "./pages/SignIn";
 import { Register } from "./pages/Register";
+import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
+import { VerifyEmail } from "./pages/VerifyEmail";
 import { Dashboard } from "./pages/Dashboard";
 import { History } from "./pages/History";
 import { Profile } from "./pages/Profile";
@@ -24,6 +27,9 @@ function App() {
           <Routes>
             <Route path="/sign-in" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route
               path="/"
               element={

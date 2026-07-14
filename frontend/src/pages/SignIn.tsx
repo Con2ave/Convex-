@@ -63,6 +63,9 @@ export function SignIn() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            <Link to="/forgot-password" style={{ fontSize: "0.78rem", alignSelf: "flex-end" }}>
+              Forgot password?
+            </Link>
           </div>
           <button
             className="btn btn-primary btn-block"

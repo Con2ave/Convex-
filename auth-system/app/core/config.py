@@ -1,7 +1,7 @@
 import os
 import re
 from typing import Optional
-from pydantic import EmailStr
+from pydantic import EmailStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -31,9 +31,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # Admin / First Superuser Seeding
+    # No default on ADMIN_PASSWORD (unlike ADMIN_USERNAME/EMAIL) - a hardcoded password default
+    # would ship a known, publicly-visible admin credential to any deployment that forgot to set
+    # it, same reasoning as JWT_SECRET_KEY having no default. The app fails to start without it.
     ADMIN_USERNAME: str = "admin"
     ADMIN_EMAIL: EmailStr = "admin@example.com"
-    ADMIN_PASSWORD: str = "SuperSecurePassword123!"
+    ADMIN_PASSWORD: str
 
     # Mocked or Real mail configurations
     SMTP_HOST: Optional[str] = None
@@ -43,6 +46,14 @@ class Settings(BaseSettings):
     EMAIL_FROM: Optional[EmailStr] = None
     EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 2
     EMAIL_VERIFY_TOKEN_EXPIRE_HOURS: int = 24
+
+    @field_validator("EMAIL_FROM", mode="before")
+    @classmethod
+    def _blank_email_from_is_unset(cls, v):
+        # An empty EMAIL_FROM= line in .env loads as "" (a string), not Python None, and ""
+        # fails EmailStr's format check - treat blank the same as absent rather than a startup
+        # crash over an unset optional setting.
+        return v or None
 
     # Study Session / Anti-cheat Settings
     # Client is expected to ping /heartbeat roughly every 20-30s while foregrounded.
@@ -92,8 +103,16 @@ class Settings(BaseSettings):
         return bool(self.GEMINI_API_KEY)
 
     @property
+    def SMTP_CONFIGURED(self) -> bool:
+        return bool(self.SMTP_HOST and self.SMTP_USER and self.SMTP_PASSWORD)
+
+    @property
     def IS_TESTING(self) -> bool:
         return self.ENVIRONMENT == "testing"
+
+    @property
+    def IS_PRODUCTION(self) -> bool:
+        return self.ENVIRONMENT == "production"
 
     @property
     def CORS_ORIGINS(self) -> list[str]:

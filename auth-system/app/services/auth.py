@@ -10,8 +10,29 @@ from app import crud
 from app.core import security
 from app.models.user import User, UserRefreshToken
 from app.schemas.user import UserRegister, UserLogin, TokenResponse, ResetPasswordRequest
+from app.services import email as email_service
 
 logger = logging.getLogger(__name__)
+
+async def send_verification_email(email: str) -> None:
+    """Generate a fresh verification token and email it. Public (not a leading-underscore
+    helper) since app.api.users' re-verify-on-email-change flow needs the exact same behavior -
+    kept in one place rather than duplicated."""
+    token = security.create_email_verification_token(email)
+    link = f"{settings.FRONTEND_BASE_URL}/verify-email?token={token}"
+    try:
+        await email_service.send_email(
+            to=email,
+            subject="Verify your ConVex email address",
+            body=(
+                "Welcome to ConVex! Verify your email address to get started:\n\n"
+                f"{link}\n\n"
+                f"This link expires in {settings.EMAIL_VERIFY_TOKEN_EXPIRE_HOURS} hours."
+            ),
+        )
+    except email_service.EmailSendError:
+        pass  # already logged inside send_email - never fail the caller's request over this
+
 
 async def register_user(db: AsyncSession, user_in: UserRegister) -> User:
     """Register a new user after validating username and email uniqueness."""
@@ -34,14 +55,9 @@ async def register_user(db: AsyncSession, user_in: UserRegister) -> User:
     # Proceed to create the user
     new_user = await crud.user.create_user(db, user_in)
     logger.info(f"Registered new user: {new_user.username} (ID: {new_user.id})")
-    
-    # Mock Email Verification trigger
-    verification_token = security.create_email_verification_token(new_user.email)
-    logger.warning(
-        f"[MOCK EMAIL SERVICE] Verification email sent to {new_user.email}. "
-        f"Token: {verification_token}"
-    )
-    
+
+    await send_verification_email(new_user.email)
+
     return new_user
 
 
@@ -190,14 +206,21 @@ async def forgot_password(db: AsyncSession, email: str) -> None:
         logger.info(f"Forgot password requested for non-existent email {email}.")
         return
 
-    # Generate token
     reset_token = security.create_password_reset_token(user.email)
-    
-    # Mock Email sending
-    logger.warning(
-        f"[MOCK EMAIL SERVICE] Password reset link sent to {user.email}. "
-        f"Token: {reset_token}"
-    )
+    link = f"{settings.FRONTEND_BASE_URL}/reset-password?token={reset_token}"
+    try:
+        await email_service.send_email(
+            to=user.email,
+            subject="Reset your ConVex password",
+            body=(
+                "Someone requested a password reset for your ConVex account. "
+                f"If this was you, reset your password here:\n\n{link}\n\n"
+                f"This link expires in {settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS} hours. "
+                "If you didn't request this, you can safely ignore this email."
+            ),
+        )
+    except email_service.EmailSendError:
+        pass
 
 
 async def reset_password(db: AsyncSession, reset_in: ResetPasswordRequest) -> None:

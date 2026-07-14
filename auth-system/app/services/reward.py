@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import uuid
+from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
@@ -18,6 +19,15 @@ from app.services import paystack_client
 from app.services import subscription as subscription_service
 
 logger = logging.getLogger(__name__)
+
+# redeem() below reads a user's balance (a live SUM over the ledger) then later writes a debit -
+# with no lock, two concurrent redemption requests for the same user both read the same
+# pre-deduction balance and both pass the "can they afford this" check, allowing a real double
+# payout. An in-process per-user lock fully closes this as long as the app runs as a single
+# worker process (it does - see render.yaml's plain `uvicorn app.main:app`, no --workers/-w). If
+# this ever moves to multiple processes/instances, this stops being sufficient and needs a
+# DB-level lock (e.g. SELECT ... FOR UPDATE on the user row) or a distributed lock instead.
+_redemption_locks: "defaultdict[int, asyncio.Lock]" = defaultdict(asyncio.Lock)
 
 SESSION_VERIFIED_REASON = "session_verified"
 REDEMPTION_REASON = "redemption:momo"
@@ -232,64 +242,70 @@ async def redeem(db: AsyncSession, user: User, redeem_in: RedeemRequest) -> Rede
     Studying and earning KP is free for everyone; cashing KP out requires an active
     subscription (admins exempt). Declining to subscribe never blocks app usage, only payout -
     the KP just sits in the balance until the user subscribes, whenever that is.
+
+    Held under _redemption_locks[user.id] for its full duration (including the payout call) so
+    two concurrent redemption requests from the same user can't both read the same pre-deduction
+    balance and both pass the affordability check - see the lock's own comment for why this is
+    safe on this app's current single-process deployment.
     """
-    if user.role != "admin" and not await subscription_service.has_active_subscription(db, user.id):
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="An active subscription is required to redeem Knowledge Points for cash. "
-                   "Subscribe from your profile to unlock cash redemptions."
+    async with _redemption_locks[user.id]:
+        if user.role != "admin" and not await subscription_service.has_active_subscription(db, user.id):
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="An active subscription is required to redeem Knowledge Points for cash. "
+                       "Subscribe from your profile to unlock cash redemptions."
+            )
+
+        tier = _find_tier(redeem_in.ghs_amount)
+        if tier is None:
+            available = ", ".join(f"GHS {t.ghs_amount}" for t in REDEMPTION_TIERS)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"GHS {redeem_in.ghs_amount} isn't an available redemption tier. Choose from: {available}."
+            )
+
+        balance = await crud.reward.get_balance(db, user.id)
+        if tier.kp_cost > balance:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient balance. You have {balance} KP; this tier costs {tier.kp_cost} KP."
+            )
+
+        redemption = await crud.reward.create_redemption(
+            db,
+            user_id=user.id,
+            points_spent=tier.kp_cost,
+            ghs_amount=tier.ghs_amount,
+            recipient_phone=redeem_in.recipient_phone,
+            network=redeem_in.network,
+            status="pending",
+            provider_ref=None,
+            reward_type="momo"
         )
-
-    tier = _find_tier(redeem_in.ghs_amount)
-    if tier is None:
-        available = ", ".join(f"GHS {t.ghs_amount}" for t in REDEMPTION_TIERS)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"GHS {redeem_in.ghs_amount} isn't an available redemption tier. Choose from: {available}."
-        )
-
-    balance = await crud.reward.get_balance(db, user.id)
-    if tier.kp_cost > balance:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Insufficient balance. You have {balance} KP; this tier costs {tier.kp_cost} KP."
-        )
-
-    redemption = await crud.reward.create_redemption(
-        db,
-        user_id=user.id,
-        points_spent=tier.kp_cost,
-        ghs_amount=tier.ghs_amount,
-        recipient_phone=redeem_in.recipient_phone,
-        network=redeem_in.network,
-        status="pending",
-        provider_ref=None,
-        reward_type="momo"
-    )
-    await crud.reward.create_ledger_entry(
-        db, user_id=user.id, points=-tier.kp_cost, reason=REDEMPTION_REASON
-    )
-
-    if settings.PAYSTACK_CONFIGURED:
-        final_status, provider_ref = await _payout_paystack(
-            redemption.id, tier, user.username, redeem_in.recipient_phone, redeem_in.network
-        )
-    else:
-        final_status, provider_ref = await _payout_mock(tier, redeem_in.recipient_phone)
-
-    if final_status == "failed":
-        # Give the KP back - the redemption never actually happened.
         await crud.reward.create_ledger_entry(
-            db, user_id=user.id, points=tier.kp_cost, reason=REDEMPTION_REFUND_REASON
+            db, user_id=user.id, points=-tier.kp_cost, reason=REDEMPTION_REASON
         )
-        logger.warning(f"Refunded {tier.kp_cost} KP to user {user.id} after failed redemption {redemption.id}.")
 
-    redemption.status = final_status
-    redemption.provider_ref = provider_ref
-    redemption = await crud.reward.save_redemption(db, redemption)
+        if settings.PAYSTACK_CONFIGURED:
+            final_status, provider_ref = await _payout_paystack(
+                redemption.id, tier, user.username, redeem_in.recipient_phone, redeem_in.network
+            )
+        else:
+            final_status, provider_ref = await _payout_mock(tier, redeem_in.recipient_phone)
 
-    logger.info(
-        f"User {user.id} redemption {redemption.id}: {tier.kp_cost} KP -> GHS {tier.ghs_amount} MoMo "
-        f"({redemption.recipient_phone}), status={final_status}."
-    )
-    return redemption
+        if final_status == "failed":
+            # Give the KP back - the redemption never actually happened.
+            await crud.reward.create_ledger_entry(
+                db, user_id=user.id, points=tier.kp_cost, reason=REDEMPTION_REFUND_REASON
+            )
+            logger.warning(f"Refunded {tier.kp_cost} KP to user {user.id} after failed redemption {redemption.id}.")
+
+        redemption.status = final_status
+        redemption.provider_ref = provider_ref
+        redemption = await crud.reward.save_redemption(db, redemption)
+
+        logger.info(
+            f"User {user.id} redemption {redemption.id}: {tier.kp_cost} KP -> GHS {tier.ghs_amount} MoMo "
+            f"({redemption.recipient_phone}), status={final_status}."
+        )
+        return redemption

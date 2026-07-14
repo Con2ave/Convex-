@@ -9,10 +9,14 @@ from fastapi import UploadFile
 from pypdf import PdfReader
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+_READ_CHUNK_BYTES = 1024 * 1024  # 1 MB
 MAX_EXTRACTED_CHARS = 15_000
 MIN_EXTRACTED_CHARS = 200  # below this, treat as "nothing usable was extracted"
 
 ALLOWED_EXTENSIONS = {".pdf", ".txt"}
+# Signature bytes for the two accepted types - checked against actual content, not just the
+# client-supplied filename/extension, which is trivial to fake.
+_PDF_MAGIC = b"%PDF-"
 
 
 class TextExtractionError(Exception):
@@ -25,14 +29,31 @@ def _extension_of(filename: Optional[str]) -> str:
     return "." + filename.rsplit(".", 1)[-1].lower()
 
 
+async def _read_bounded(upload_file: UploadFile, max_bytes: int) -> bytes:
+    """Reads in chunks, aborting as soon as max_bytes is exceeded rather than buffering an
+    arbitrarily large request body into memory before ever checking its size."""
+    chunks = []
+    total = 0
+    while True:
+        chunk = await upload_file.read(_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise TextExtractionError("That file is too large (10 MB max).")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 async def extract_text(upload_file: UploadFile) -> str:
     ext = _extension_of(upload_file.filename)
     if ext not in ALLOWED_EXTENSIONS:
         raise TextExtractionError("Only PDF and plain text (.txt) files are supported right now.")
 
-    data = await upload_file.read()
-    if len(data) > MAX_FILE_SIZE_BYTES:
-        raise TextExtractionError("That file is too large (10 MB max).")
+    data = await _read_bounded(upload_file, MAX_FILE_SIZE_BYTES)
+
+    if ext == ".pdf" and not data.startswith(_PDF_MAGIC):
+        raise TextExtractionError("That doesn't look like a valid PDF file.")
 
     if ext == ".txt":
         text = data.decode("utf-8", errors="replace")

@@ -138,6 +138,20 @@ async def test_start_guided_session_oversized_file_rejected(client: AsyncClient,
 
 
 @pytest.mark.asyncio
+async def test_start_guided_session_fake_pdf_rejected(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    """A .pdf-named upload whose content doesn't actually start with the PDF signature must be
+    rejected by content sniffing, not just trusted from the filename extension."""
+    _mock_ai_success(monkeypatch)
+    headers = await _auth_headers(client)
+
+    response = await _start_guided(
+        client, headers, db_session, filename="fake.pdf", content=b"this is not really a pdf file"
+    )
+    assert response.status_code == 422
+    assert "doesn't look like a valid PDF" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_start_guided_session_blocked_by_open_session(client: AsyncClient, db_session: AsyncSession, monkeypatch):
     _mock_ai_success(monkeypatch)
     headers = await _auth_headers(client)

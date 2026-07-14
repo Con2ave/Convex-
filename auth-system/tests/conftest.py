@@ -14,6 +14,10 @@ os.environ["PAYSTACK_SECRET_KEY"] = ""
 # Same reasoning for AI quiz generation - tests always mock app.services.ai_client.generate_quiz
 # directly and must never depend on (or accidentally exercise) a real Gemini key.
 os.environ["GEMINI_API_KEY"] = ""
+# Same reasoning again for email - tests must never actually send real email via the developer's
+# real SMTP credentials. With this blank, app.services.email falls back to its log-only path.
+os.environ["SMTP_USER"] = ""
+os.environ["SMTP_PASSWORD"] = ""
 
 # Import app, settings, and db dependencies
 from app.main import app

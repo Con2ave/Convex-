@@ -57,7 +57,9 @@ async def logout(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def refresh(
+    request: Request,
     token_in: TokenRefreshRequest,
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -93,10 +95,12 @@ async def reset_password(
 
 
 @router.get("/verify-email", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def verify_email(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """Verify registration email address using token sent inside registration logs."""
+    """Verify registration email address using the token sent to the user's inbox."""
     await auth_service.verify_email_token(db=db, token=token)
     return {"detail": "Email address successfully verified."}

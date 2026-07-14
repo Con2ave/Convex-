@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.models.user import User, UserRefreshToken
 from app.core import security
+from app.crud.user import hash_refresh_token
 
 # Test User Seed Configuration
 TEST_USER_DATA = {
@@ -125,13 +126,35 @@ async def test_user_logout_invalidates_token(client: AsyncClient, db_session: As
     logout_resp = await client.post("/auth/logout", json={"refresh_token": refresh_token})
     assert logout_resp.status_code == 200
     
-    # Assert DB token status is revoked
+    # Assert DB token status is revoked - stored (and looked up) as a hash, not the raw token.
     result = await db_session.execute(
-        select(UserRefreshToken).where(UserRefreshToken.token == refresh_token)
+        select(UserRefreshToken).where(UserRefreshToken.token == hash_refresh_token(refresh_token))
     )
     db_token = result.scalar_one_or_none()
     assert db_token is not None
     assert db_token.is_revoked is True
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_never_stored_in_plaintext(client: AsyncClient, db_session: AsyncSession):
+    """A DB compromise alone must not hand over a usable bearer credential - the raw JWT should
+    never appear anywhere in the refresh_tokens table, only its hash."""
+    await client.post("/auth/register", json=TEST_USER_DATA)
+    login_resp = await client.post("/auth/login", data={
+        "username": TEST_USER_DATA["username"],
+        "password": TEST_USER_DATA["password"]
+    })
+    refresh_token = login_resp.json()["refresh_token"]
+
+    raw_match = await db_session.execute(
+        select(UserRefreshToken).where(UserRefreshToken.token == refresh_token)
+    )
+    assert raw_match.scalar_one_or_none() is None
+
+    hashed_match = await db_session.execute(
+        select(UserRefreshToken).where(UserRefreshToken.token == hash_refresh_token(refresh_token))
+    )
+    assert hashed_match.scalar_one_or_none() is not None
 
 
 # ----------------- Refresh Token Rotation Tests -----------------
