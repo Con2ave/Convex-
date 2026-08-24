@@ -160,10 +160,22 @@ async def log_event(db: AsyncSession, session_id: int, event_type: str, detail: 
 
 # ----------------- Session Quiz CRUD Operations -----------------
 
-async def create_quiz(db: AsyncSession, session_id: int, source_filename: Optional[str]) -> SessionQuiz:
+async def create_quiz(
+    db: AsyncSession,
+    session_id: int,
+    source_filename: Optional[str],
+    material_storage_key: Optional[str] = None,
+    material_content_type: Optional[str] = None,
+) -> SessionQuiz:
     """Create the quiz row in "generating" state at guided-session-start time; questions are
     filled in later by the background generation task."""
-    quiz = SessionQuiz(session_id=session_id, status="generating", source_filename=source_filename)
+    quiz = SessionQuiz(
+        session_id=session_id,
+        status="generating",
+        source_filename=source_filename,
+        material_storage_key=material_storage_key,
+        material_content_type=material_content_type,
+    )
     db.add(quiz)
     await db.commit()
     await db.refresh(quiz)

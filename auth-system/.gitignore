@@ -116,6 +116,8 @@ $RECYCLE.BIN/
 *.log
 logs/
 *.out
+uploaded_materials/
+test_uploaded_materials/
 
 # ========================
 # MISC

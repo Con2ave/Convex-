@@ -7,6 +7,7 @@ import { formatClock } from "../utils/format";
 import { AmbientSound } from "../components/AmbientSound";
 import { SandTimer } from "../components/SandTimer";
 import { ForestBackdrop } from "../components/ForestBackdrop";
+import { CloseIcon, DocumentIcon } from "../components/icons";
 
 const HEARTBEAT_INTERVAL_MS = 20_000; // must stay under the backend's grace window (default 45s)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
@@ -27,6 +28,10 @@ export function ActiveSession() {
   const [ending, setEnding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ringNow, setRingNow] = useState(Date.now());
+  const [showMaterial, setShowMaterial] = useState(false);
+  const [materialUrl, setMaterialUrl] = useState<string | null>(null);
+  const [materialLoading, setMaterialLoading] = useState(false);
+  const [materialError, setMaterialError] = useState<string | null>(null);
 
   const baseline = useRef({ seconds: 0, at: Date.now() });
 
@@ -91,6 +96,12 @@ export function ActiveSession() {
     return () => clearInterval(t);
   }, [pendingCheck]);
 
+  useEffect(() => {
+    return () => {
+      if (materialUrl) URL.revokeObjectURL(materialUrl);
+    };
+  }, [materialUrl]);
+
   async function handlePause() {
     try {
       const res = await api.pauseSession(sessionId);
@@ -134,6 +145,22 @@ export function ActiveSession() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't end this session.");
       setEnding(false);
+    }
+  }
+
+  async function handleViewMaterial() {
+    setShowMaterial(true);
+    setMaterialError(null);
+    if (materialUrl) return;
+
+    setMaterialLoading(true);
+    try {
+      const blob = await api.getSessionMaterial(sessionId);
+      setMaterialUrl(URL.createObjectURL(blob));
+    } catch (err) {
+      setMaterialError(err instanceof ApiError ? err.message : "Couldn't load your study material.");
+    } finally {
+      setMaterialLoading(false);
     }
   }
 
@@ -249,12 +276,39 @@ export function ActiveSession() {
             </div>
           ) : (
             <div className="session-controls">
+              {session.quiz?.material_available && (
+                <button className="btn btn-ghost" onClick={() => void handleViewMaterial()}>
+                  <DocumentIcon size={18} />
+                  View material
+                </button>
+              )}
               {status === "active" ? (
                 <button className="btn btn-ghost" onClick={() => void handlePause()}>Pause</button>
               ) : status === "paused" ? (
                 <button className="btn btn-ghost" onClick={() => void handleResume()}>Resume</button>
               ) : null}
               <button className="btn btn-danger" onClick={() => setShowEndForm(true)}>End session</button>
+            </div>
+          )}
+
+          {showMaterial && (
+            <div className="material-viewer-backdrop" onClick={() => setShowMaterial(false)}>
+              <div className="material-viewer-panel" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <div className="material-viewer-top">
+                  <div className="material-viewer-title">
+                    <DocumentIcon size={18} />
+                    <span>{session.quiz?.source_filename ?? "Study material"}</span>
+                  </div>
+                  <button className="material-viewer-close" onClick={() => setShowMaterial(false)} aria-label="Close material viewer">
+                    <CloseIcon size={18} />
+                  </button>
+                </div>
+                <div className="material-viewer-body">
+                  {materialLoading && <p className="text-soft">Loading material...</p>}
+                  {materialError && <div className="banner banner-error">{materialError}</div>}
+                  {materialUrl && <iframe title="Study material" src={materialUrl} className="material-frame" />}
+                </div>
+              </div>
             </div>
           )}
         </div>

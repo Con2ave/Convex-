@@ -148,6 +148,38 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return (await res.json()) as T;
 }
 
+async function requestBlob(path: string, opts: RequestOptions = {}): Promise<Blob> {
+  const { method = "GET", auth = true, _retried = false } = opts;
+
+  const headers: Record<string, string> = {};
+  if (auth && tokenStore.access) {
+    headers["Authorization"] = `Bearer ${tokenStore.access}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { method, headers });
+
+  if (res.status === 401 && auth && !_retried) {
+    const refreshed = await tryRefresh();
+    if (refreshed) {
+      return requestBlob(path, { ...opts, _retried: true });
+    }
+    tokenStore.clear();
+    throw new ApiError(401, "Your session expired. Please sign in again.");
+  }
+
+  if (!res.ok) {
+    let payload: unknown = null;
+    try {
+      payload = await res.json();
+    } catch {
+      // non-JSON error body, fall through to the generic message
+    }
+    throw new ApiError(res.status, extractMessage(payload, `Request failed (${res.status}).`));
+  }
+
+  return res.blob();
+}
+
 // ----------------- Auth -----------------
 
 export function register(input: {
@@ -218,6 +250,10 @@ export function listSessions(): Promise<StudySessionResponse[]> {
 
 export function getSession(id: number): Promise<StudySessionDetail> {
   return request(`/study-sessions/${id}`);
+}
+
+export function getSessionMaterial(id: number): Promise<Blob> {
+  return requestBlob(`/study-sessions/${id}/material`);
 }
 
 export function startSession(subject_tag: string | null): Promise<StudySessionResponse> {

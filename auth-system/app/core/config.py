@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     # free quota and was verified end-to-end (including structured JSON output) against a real key.
     GEMINI_MODEL: str = "gemini-flash-latest"
 
+    # Local storage for uploaded guided-session PDF material. In production this should point to
+    # persistent storage mounted for the app, or be replaced by object storage.
+    STUDY_MATERIAL_UPLOAD_DIR: str = "uploaded_materials"
+
     # Google Sign-In (Google Identity Services, ID-token flow - no client secret needed). Get a
     # Client ID from https://console.cloud.google.com/apis/credentials. Left unset in dev:
     # /auth/google fails closed with 503, matching the AI-not-configured precedent above.

@@ -14,6 +14,8 @@ class QuizStatus(BaseModel):
     passed: Optional[bool] = None
     score: Optional[int] = None
     submitted_at: Optional[datetime] = None
+    source_filename: Optional[str] = None
+    material_available: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

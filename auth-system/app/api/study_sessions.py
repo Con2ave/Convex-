@@ -1,6 +1,8 @@
 import logging
+from urllib.parse import quote
 from typing import List
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
@@ -18,6 +20,7 @@ from app.schemas.study_session import (
 from app.schemas.quiz import QuizOut, QuizQuestionOut, QuizSubmitRequest, QuizResultOut
 from app.services import study_session as study_session_service
 from app.services import quiz as quiz_service
+from app.services import material_storage
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +75,29 @@ async def get_session(
 ):
     """Retrieve full detail for one session, including its anti-cheat check history."""
     return await study_session_service.get_owned_session(db, session_id, current_user)
+
+
+@router.get("/{session_id}/material")
+async def get_session_material(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """Return the uploaded PDF material for a guided session owned by the current user."""
+    session = await study_session_service.get_owned_session(db, session_id, current_user)
+    quiz = session.quiz
+    if not quiz or not quiz.material_storage_key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study material not found.")
+
+    path = material_storage.get_material_path(quiz.material_storage_key)
+    if not path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study material not found.")
+
+    return FileResponse(
+        path,
+        media_type=quiz.material_content_type or "application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(quiz.source_filename or 'study-material.pdf')}"},
+    )
 
 
 @router.post("/{session_id}/heartbeat", response_model=HeartbeatResponse)

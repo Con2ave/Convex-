@@ -23,13 +23,13 @@ class TextExtractionError(Exception):
     """Raised for anything that stops us from getting usable text out of the upload."""
 
 
-def _extension_of(filename: Optional[str]) -> str:
+def extension_of(filename: Optional[str]) -> str:
     if not filename or "." not in filename:
         return ""
     return "." + filename.rsplit(".", 1)[-1].lower()
 
 
-async def _read_bounded(upload_file: UploadFile, max_bytes: int) -> bytes:
+async def read_bounded(upload_file: UploadFile, max_bytes: int = MAX_FILE_SIZE_BYTES) -> bytes:
     """Reads in chunks, aborting as soon as max_bytes is exceeded rather than buffering an
     arbitrarily large request body into memory before ever checking its size."""
     chunks = []
@@ -45,12 +45,10 @@ async def _read_bounded(upload_file: UploadFile, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
-async def extract_text(upload_file: UploadFile) -> str:
-    ext = _extension_of(upload_file.filename)
+def extract_text_from_bytes(data: bytes, filename: Optional[str]) -> str:
+    ext = extension_of(filename)
     if ext not in ALLOWED_EXTENSIONS:
         raise TextExtractionError("Only PDF and plain text (.txt) files are supported right now.")
-
-    data = await _read_bounded(upload_file, MAX_FILE_SIZE_BYTES)
 
     if ext == ".pdf" and not data.startswith(_PDF_MAGIC):
         raise TextExtractionError("That doesn't look like a valid PDF file.")
@@ -71,3 +69,8 @@ async def extract_text(upload_file: UploadFile) -> str:
         )
 
     return text[:MAX_EXTRACTED_CHARS]
+
+
+async def extract_text(upload_file: UploadFile) -> str:
+    data = await read_bounded(upload_file)
+    return extract_text_from_bytes(data, upload_file.filename)

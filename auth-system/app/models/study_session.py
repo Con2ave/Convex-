@@ -120,8 +120,14 @@ class SessionQuiz(Base):
     passed: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     submitted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     source_filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    material_storage_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    material_content_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     session: Mapped["StudySession"] = relationship("StudySession", back_populates="quiz")
+
+    @property
+    def material_available(self) -> bool:
+        return bool(self.material_storage_key)

@@ -38,6 +38,8 @@ export interface QuizStatus {
   passed: boolean | null;
   score: number | null;
   submitted_at: string | null;
+  source_filename: string | null;
+  material_available: boolean;
 }
 
 export interface StudySessionResponse {

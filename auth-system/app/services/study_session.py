@@ -14,7 +14,13 @@ from app.models.study_session import StudySession, SessionCheck
 from app.schemas.study_session import StudySessionStart, CheckRespondRequest, EndSessionRequest
 from app.services import reward as reward_service
 from app.services import ai_client
-from app.services.text_extraction import extract_text, TextExtractionError
+from app.services import material_storage
+from app.services.text_extraction import (
+    extract_text_from_bytes,
+    extension_of,
+    read_bounded,
+    TextExtractionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +101,8 @@ async def start_guided_session(
         )
 
     try:
-        material_text = await extract_text(material)
+        material_bytes = await read_bounded(material)
+        material_text = extract_text_from_bytes(material_bytes, material.filename)
     except TextExtractionError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
@@ -107,7 +114,19 @@ async def start_guided_session(
         next_check_at=now + _next_check_delay(),
         target_minutes=target_minutes,
     )
-    quiz = await crud.study_session.create_quiz(db, session.id, source_filename=material.filename)
+    material_storage_key = None
+    material_content_type = None
+    if extension_of(material.filename) == ".pdf":
+        material_storage_key = material_storage.save_pdf_material(session.id, material_bytes)
+        material_content_type = material.content_type or "application/pdf"
+
+    quiz = await crud.study_session.create_quiz(
+        db,
+        session.id,
+        source_filename=material.filename,
+        material_storage_key=material_storage_key,
+        material_content_type=material_content_type,
+    )
     # session was fetched (eager-loading quiz) before this row existed, so its in-memory quiz
     # attribute is still stale None - set it directly rather than re-querying again.
     session.quiz = quiz

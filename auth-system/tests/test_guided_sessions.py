@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from datetime import datetime, timezone
 from httpx import AsyncClient
 from sqlalchemy import select, update
@@ -9,6 +10,7 @@ from app.models.study_session import StudySession
 from app.models.reward import RewardLedgerEntry
 from app.models.user import User
 from app.services import ai_client
+from app.services import study_session as study_session_service
 
 TEST_USER_DATA = {
     "username": "guideduser",
@@ -59,12 +61,12 @@ def _mock_ai_failure(monkeypatch):
 
 async def _start_guided(
     client: AsyncClient, headers: dict, db_session: AsyncSession, target_minutes: int = 45,
-    filename="notes.txt", content=b"x" * 500,
+    filename="notes.txt", content=b"x" * 500, content_type="text/plain",
 ):
     response = await client.post(
         "/study-sessions/start-guided",
         data={"subject_tag": "Biology", "target_minutes": str(target_minutes)},
-        files={"material": (filename, content, "text/plain")},
+        files={"material": (filename, content, content_type)},
         headers=headers,
     )
     # The quiz background task runs under its own, separate DB session (see
@@ -104,6 +106,45 @@ async def test_start_guided_session_success(client: AsyncClient, db_session: Asy
 
     quiz_resp = await client.get(f"/study-sessions/{data['id']}", headers=headers)
     assert quiz_resp.json()["quiz"]["status"] == "ready"
+
+
+@pytest.mark.asyncio
+async def test_guided_pdf_material_can_be_viewed_by_owner(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    _mock_ai_success(monkeypatch)
+    upload_dir = Path("test_uploaded_materials")
+    monkeypatch.setattr(settings, "STUDY_MATERIAL_UPLOAD_DIR", str(upload_dir))
+    monkeypatch.setattr(study_session_service, "extract_text_from_bytes", lambda data, filename: "readable text " * 40)
+    headers = await _auth_headers(client)
+    pdf_bytes = b"%PDF-1.4\nfake test pdf bytes"
+
+    start_resp = await _start_guided(
+        client,
+        headers,
+        db_session,
+        filename="biology-notes.pdf",
+        content=pdf_bytes,
+        content_type="application/pdf",
+    )
+    session_id = start_resp.json()["id"]
+
+    material_resp = await client.get(f"/study-sessions/{session_id}/material", headers=headers)
+    assert material_resp.status_code == 200
+    assert material_resp.headers["content-type"].startswith("application/pdf")
+    assert material_resp.content == pdf_bytes
+
+    other_headers = await _auth_headers(
+        client,
+        {
+            "username": "guidedother",
+            "email": "guidedother@example.com",
+            "password": "SecurePassword123!",
+            "password_confirm": "SecurePassword123!",
+        },
+    )
+    other_resp = await client.get(f"/study-sessions/{session_id}/material", headers=other_headers)
+    assert other_resp.status_code == 404
 
 
 @pytest.mark.asyncio
