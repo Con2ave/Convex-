@@ -8,6 +8,7 @@ interface AuthContextValue {
   status: "loading" | "signed-in" | "signed-out";
   signIn: (username: string, password: string) => Promise<void>;
   signUp: (input: { username: string; email: string; password: string; password_confirm: string }) => Promise<void>;
+  googleSignIn: (credential: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -52,6 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const googleSignIn = useCallback(async (credential: string) => {
+    await api.googleSignIn(credential);
+    const me = await api.getCurrentUser();
+    setUser(me);
+    setStatus("signed-in");
+  }, []);
+
   const signOut = useCallback(async () => {
     await api.logout();
     setUser(null);
@@ -59,7 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, status, signIn, signUp, signOut }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, status, signIn, signUp, googleSignIn, signOut }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 

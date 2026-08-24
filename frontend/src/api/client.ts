@@ -169,6 +169,16 @@ export async function login(username: string, password: string): Promise<TokenRe
   return tokens;
 }
 
+export async function googleSignIn(credential: string): Promise<TokenResponse> {
+  const tokens = await request<TokenResponse>("/auth/google", {
+    method: "POST",
+    body: { credential },
+    auth: false,
+  });
+  tokenStore.set(tokens);
+  return tokens;
+}
+
 export async function logout(): Promise<void> {
   const refresh_token = tokenStore.refresh;
   tokenStore.clear();

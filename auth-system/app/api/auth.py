@@ -10,7 +10,8 @@ from app.schemas.user import (
     TokenRefreshRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    UserResponse
+    UserResponse,
+    GoogleSignInRequest,
 )
 from app.services import auth as auth_service
 from app.core.limiter import limiter
@@ -42,6 +43,20 @@ async def login(
     """
     user_login = UserLogin(username=form_data.username, password=form_data.password)
     user = await auth_service.authenticate_user(db=db, login_in=user_login)
+    tokens = await auth_service.issue_tokens(db=db, user=user)
+    return tokens
+
+
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def google_sign_in(
+    request: Request,
+    google_in: GoogleSignInRequest,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """Sign in or sign up via a Google Identity Services ID token. Auto-links to an existing
+    account by verified email if one exists; otherwise provisions a new account."""
+    user = await auth_service.google_sign_in(db=db, credential=google_in.credential)
     tokens = await auth_service.issue_tokens(db=db, user=user)
     return tokens
 

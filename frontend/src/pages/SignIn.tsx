@@ -2,9 +2,10 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 export function SignIn() {
-  const { signIn } = useAuth();
+  const { signIn, googleSignIn } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +18,19 @@ export function SignIn() {
     setSubmitting(true);
     try {
       await signIn(username, password);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setError(null);
+    setSubmitting(true);
+    try {
+      await googleSignIn(credential);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
@@ -76,6 +90,9 @@ export function SignIn() {
             {submitting ? "Signing in…" : "Continue"}
           </button>
         </form>
+
+        <div className="divider-row">or</div>
+        <GoogleSignInButton text="signin_with" onCredential={handleGoogleCredential} />
 
         <p className="text-soft" style={{ marginTop: "auto", textAlign: "center", fontSize: "0.8rem", paddingTop: "2rem" }}>
           New here? <Link to="/register">Create account</Link>

@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     # free quota and was verified end-to-end (including structured JSON output) against a real key.
     GEMINI_MODEL: str = "gemini-flash-latest"
 
+    # Google Sign-In (Google Identity Services, ID-token flow - no client secret needed). Get a
+    # Client ID from https://console.cloud.google.com/apis/credentials. Left unset in dev:
+    # /auth/google fails closed with 503, matching the AI-not-configured precedent above.
+    GOOGLE_CLIENT_ID: Optional[str] = None
+
     @property
     def PAYSTACK_CONFIGURED(self) -> bool:
         return bool(self.PAYSTACK_SECRET_KEY)
@@ -101,6 +106,10 @@ class Settings(BaseSettings):
     @property
     def AI_CONFIGURED(self) -> bool:
         return bool(self.GEMINI_API_KEY)
+
+    @property
+    def GOOGLE_CONFIGURED(self) -> bool:
+        return bool(self.GOOGLE_CLIENT_ID)
 
     @property
     def SMTP_CONFIGURED(self) -> bool:

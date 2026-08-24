@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import HTTPException, status
@@ -11,8 +12,11 @@ from app.core import security
 from app.models.user import User, UserRefreshToken
 from app.schemas.user import UserRegister, UserLogin, TokenResponse, ResetPasswordRequest
 from app.services import email as email_service
+from app.services import google_oauth
 
 logger = logging.getLogger(__name__)
+
+_USERNAME_SANITIZE_RE = re.compile(r"[^a-z0-9_]")
 
 async def send_verification_email(email: str) -> None:
     """Generate a fresh verification token and email it. Public (not a leading-underscore
@@ -273,3 +277,88 @@ async def verify_email_token(db: AsyncSession, token: str) -> None:
 
     await crud.user.verify_user(db, user)
     logger.info(f"User {user.username} email ({user.email}) verified.")
+
+
+async def _unique_username_from_email(db: AsyncSession, email: str) -> str:
+    """Derive a unique username from a Google email's local-part for auto-provisioned accounts.
+
+    Sanitizes to [a-z0-9_] (UserBase enforces 3-50 chars, no character-set restriction, but a
+    clean auto-generated username should still look like one), then probes base/base1/base2/...
+    until one isn't taken. Collisions are expected and normal (e.g. two different providers'
+    addresses both sanitizing to "johnsmith") - handled by the numeric-suffix probe, not an error.
+    """
+    local_part = email.split("@", 1)[0].lower()
+    base = _USERNAME_SANITIZE_RE.sub("", local_part)
+    if len(base) < 3:
+        base = (base + "user")[:3] if base else "user"
+    base = base[:46]  # leave room for a numeric suffix within the 50-char cap
+
+    candidate = base
+    suffix = 0
+    while await crud.user.get_user_by_username(db, candidate):
+        suffix += 1
+        candidate = f"{base}{suffix}"
+    return candidate
+
+
+async def google_sign_in(db: AsyncSession, credential: str) -> User:
+    """Verify a Google ID token and return the matching, newly-linked, or newly-created User.
+
+    Resolution order:
+      1. google_id already on file -> that's the account (returning Google user).
+      2. No google_id match, but the verified email matches an existing account (password-based
+         or otherwise) -> link google_id onto that account and sign into it. Per product
+         decision: auto-link, never create a second account or error on email collision - this
+         is safe because Google's own email verification is the trust anchor, not anything
+         ConVex controls.
+      3. Neither matches -> provision a brand-new Google-only account.
+    """
+    if not settings.GOOGLE_CONFIGURED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in isn't available right now."
+        )
+
+    try:
+        identity = await google_oauth.verify_google_id_token(credential)
+    except google_oauth.GoogleTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired Google credential."
+        )
+
+    if not identity.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google account email is not verified."
+        )
+
+    user = await crud.user.get_user_by_google_id(db, identity.google_id)
+    if user:
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account is deactivated."
+            )
+        await crud.user.update_last_login(db, user)
+        logger.info(f"Google sign-in matched existing linked user {user.username} (ID: {user.id}).")
+        return user
+
+    existing = await crud.user.get_user_by_email(db, identity.email)
+    if existing:
+        if not existing.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User account is deactivated."
+            )
+        existing = await crud.user.link_google_id(db, existing, identity.google_id)
+        await crud.user.update_last_login(db, existing)
+        logger.info(f"Linked Google account to existing user {existing.username} (ID: {existing.id}).")
+        return existing
+
+    username = await _unique_username_from_email(db, identity.email)
+    new_user = await crud.user.create_google_user(
+        db, username=username, email=identity.email, google_id=identity.google_id
+    )
+    logger.info(f"Provisioned new Google-linked user: {new_user.username} (ID: {new_user.id})")
+    return new_user

@@ -604,6 +604,22 @@ textarea.input {
   border: 1px solid var(--border);
 }
 
+.divider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.3rem 0;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+.divider-row::before,
+.divider-row::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
 /* ---------- Bottom nav ---------- */
 
 .bottom-nav {

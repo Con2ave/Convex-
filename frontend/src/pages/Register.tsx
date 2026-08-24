@@ -2,9 +2,10 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/client";
+import { GoogleSignInButton } from "../components/GoogleSignInButton";
 
 export function Register() {
-  const { signUp } = useAuth();
+  const { signUp, googleSignIn } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -19,6 +20,19 @@ export function Register() {
     setSubmitting(true);
     try {
       await signUp({ username, email, password, password_confirm: passwordConfirm });
+      navigate("/subscribe", { replace: true, state: { onboarding: true } });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setError(null);
+    setSubmitting(true);
+    try {
+      await googleSignIn(credential);
       navigate("/subscribe", { replace: true, state: { onboarding: true } });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
@@ -99,6 +113,9 @@ export function Register() {
             {submitting ? "Creating account…" : "Create account"}
           </button>
         </form>
+
+        <div className="divider-row">or</div>
+        <GoogleSignInButton text="signup_with" onCredential={handleGoogleCredential} />
 
         <p className="text-soft" style={{ marginTop: "auto", textAlign: "center", fontSize: "0.8rem", paddingTop: "2rem" }}>
           Already have an account? <Link to="/sign-in">Sign in</Link>

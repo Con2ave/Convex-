@@ -50,6 +50,10 @@ class UserLogin(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class GoogleSignInRequest(BaseModel):
+    credential: str = Field(..., description="Google Identity Services ID token (JWT credential)")
+
+
 class UserResponse(UserBase):
     id: int
     role: str

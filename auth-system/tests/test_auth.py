@@ -5,7 +5,9 @@ from sqlalchemy import select
 
 from app.models.user import User, UserRefreshToken
 from app.core import security
+from app.core.config import settings
 from app.crud.user import hash_refresh_token
+from app.services import google_oauth
 
 # Test User Seed Configuration
 TEST_USER_DATA = {
@@ -289,6 +291,144 @@ async def test_email_verification_success(client: AsyncClient, db_session: Async
     )
     db_user = result.scalar_one()
     assert db_user.is_verified is True
+
+
+# ----------------- Google Sign-In Tests -----------------
+
+def _mock_google_identity(
+    monkeypatch,
+    *,
+    google_id: str = "google-sub-123",
+    email: str = "newgoogle@example.com",
+    email_verified: bool = True,
+    name: str = "Test User",
+) -> None:
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client-id")
+
+    async def fake_verify(credential: str):
+        return google_oauth.GoogleIdentity(
+            google_id=google_id, email=email, email_verified=email_verified, name=name
+        )
+
+    monkeypatch.setattr(google_oauth, "verify_google_id_token", fake_verify)
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_new_user_creates_account(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    _mock_google_identity(monkeypatch)
+
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+
+    result = await db_session.execute(select(User).where(User.email == "newgoogle@example.com"))
+    user = result.scalar_one()
+    assert user.is_verified is True
+    assert user.is_active is True
+    assert user.google_id == "google-sub-123"
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_returning_user_matched_by_google_id(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    _mock_google_identity(monkeypatch)
+
+    first = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert first.status_code == 200
+
+    second = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert second.status_code == 200
+
+    result = await db_session.execute(select(User).where(User.email == "newgoogle@example.com"))
+    assert len(result.scalars().all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_links_existing_password_account_by_email(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    password_user_data = {
+        "username": "existinguser",
+        "email": "existing@example.com",
+        "password": "SecurePassword123!",
+        "password_confirm": "SecurePassword123!"
+    }
+    await client.post("/auth/register", json=password_user_data)
+
+    result = await db_session.execute(select(User).where(User.username == "existinguser"))
+    existing_user = result.scalar_one()
+    assert existing_user.google_id is None
+
+    _mock_google_identity(monkeypatch, email="existing@example.com")
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 200
+    data = response.json()
+
+    # The returned tokens must belong to the EXISTING user, not a newly created one.
+    payload = security.decode_token(data["access_token"], settings.JWT_SECRET_KEY)
+    assert int(payload["sub"]) == existing_user.id
+
+    result = await db_session.execute(select(User).where(User.email == "existing@example.com"))
+    users = result.scalars().all()
+    assert len(users) == 1
+    assert users[0].google_id == "google-sub-123"
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_rejects_unverified_email(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    _mock_google_identity(monkeypatch, email_verified=False)
+
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 401
+
+    result = await db_session.execute(select(User).where(User.email == "newgoogle@example.com"))
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_unconfigured_returns_503(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", None)
+
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_username_collision_gets_suffixed(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    taken_user_data = {
+        "username": "johnsmith",
+        "email": "johnsmith@example.com",
+        "password": "SecurePassword123!",
+        "password_confirm": "SecurePassword123!"
+    }
+    await client.post("/auth/register", json=taken_user_data)
+
+    _mock_google_identity(monkeypatch, email="john.smith@othersite.com")
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 200
+
+    result = await db_session.execute(select(User).where(User.email == "john.smith@othersite.com"))
+    new_user = result.scalar_one()
+    assert new_user.username == "johnsmith1"
+
+
+@pytest.mark.asyncio
+async def test_google_sign_in_deactivated_account_blocked(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    inactive_pwd_hash = security.get_password_hash("SecurePassword123!")
+    db_inactive = User(
+        username="deactivateduser",
+        email="deactivated@example.com",
+        hashed_password=inactive_pwd_hash,
+        role="user",
+        is_active=False,
+        is_verified=True
+    )
+    db_session.add(db_inactive)
+    await db_session.commit()
+
+    _mock_google_identity(monkeypatch, email="deactivated@example.com")
+    response = await client.post("/auth/google", json={"credential": "fake-credential"})
+    assert response.status_code == 400
+    assert "deactivated" in response.json()["detail"].lower()
 
 
 # ----------------- Role-Based Access Control (RBAC) Tests -----------------

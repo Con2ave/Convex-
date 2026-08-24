@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import select, delete, update
@@ -22,6 +23,11 @@ async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User
 async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     """Retrieve a user by their unique email address."""
     result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+async def get_user_by_google_id(db: AsyncSession, google_id: str) -> Optional[User]:
+    """Retrieve a user by their linked Google account's stable subject ID."""
+    result = await db.execute(select(User).where(User.google_id == google_id))
     return result.scalar_one_or_none()
 
 async def get_users(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[User]:
@@ -59,6 +65,36 @@ async def create_admin_user(db: AsyncSession, username: str, email: str, passwor
         is_active=True,
         is_verified=True
     )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
+async def create_google_user(db: AsyncSession, username: str, email: str, google_id: str) -> User:
+    """Provision a new account for a user who signed up entirely via Google (no password of
+    their own). hashed_password still gets a real bcrypt hash of a random, never-revealed
+    secret rather than a NULL/sentinel value - User.hashed_password stays NOT NULL with zero
+    special-casing anywhere else (a Google-only account's password login just fails the normal
+    verify_password() check like any wrong password would). is_verified is True immediately -
+    Google already verified this email (checked by the caller before this is invoked)."""
+    db_user = User(
+        username=username,
+        email=email,
+        hashed_password=get_password_hash(secrets.token_urlsafe(32)),
+        google_id=google_id,
+        role="user",
+        is_active=True,
+        is_verified=True
+    )
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+    return db_user
+
+async def link_google_id(db: AsyncSession, db_user: User, google_id: str) -> User:
+    """Attach a Google subject ID to an existing account (password-based or otherwise) whose
+    email matched a Google sign-in - see app.services.auth.google_sign_in."""
+    db_user.google_id = google_id
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
